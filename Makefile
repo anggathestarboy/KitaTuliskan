@@ -21,9 +21,11 @@ server/node_modules: server/package.json ; cd server && npm i --silent
 site/node_modules:   site/package.json   ; cd site && npm i --silent
 
 PORT = $(shell sed -n 's/^ADDR=.*:\([0-9]*\)$$/\1/p' server/.env)
+# cek port tanpa nc/lsof (tidak ada di semua mesin): pakai /dev/tcp bawaan bash
+up = (exec 3<>/dev/tcp/127.0.0.1/$(1)) 2>/dev/null
 dev: setup
-	@nc -z 127.0.0.1 3306 || { echo "MySQL 127.0.0.1:3306 belum jalan (DBngin)"; exit 1; }
-	@! nc -z 127.0.0.1 $(PORT) || { echo "Port $(PORT) sudah dipakai:"; lsof -nP -iTCP:$(PORT) -sTCP:LISTEN | tail -n +2; echo "Ganti ADDR di server/.env dan CMS_URL di site/.env"; exit 1; }
+	@$(call up,3306) || { echo "MySQL 127.0.0.1:3306 belum jalan (DBngin / mysql.server start)"; exit 1; }
+	@! $(call up,$(PORT)) || { echo "Port $(PORT) sudah dipakai. Ganti ADDR di server/.env dan CMS_URL di site/.env"; command -v lsof >/dev/null && lsof -nP -iTCP:$(PORT) -sTCP:LISTEN | tail -n +2; exit 1; }
 	@trap '$(MAKE) -s stop' EXIT INT TERM; \
 	( cd server && npx vite ) & \
 	( cd site && npx astro dev ) & \
@@ -34,7 +36,8 @@ dev: setup
 
 # make stop → matikan semua yang dijalankan make dev (Go di $(PORT), Vite 5173, Astro 4321)
 stop:
-	@for p in $(PORT) 4321 5173; do lsof -nP -tiTCP:$$p -sTCP:LISTEN | xargs -r kill 2>/dev/null; done
+	@command -v lsof >/dev/null && for p in $(PORT) 4321 5173; do lsof -nP -tiTCP:$$p -sTCP:LISTEN | xargs -r kill 2>/dev/null; done; true
+	@pkill -f "[e]xe/draftcms-lite" 2>/dev/null; pkill -f "[g]o run \." 2>/dev/null; true
 	@pkill -f "node_modules/[.]bin/vite" 2>/dev/null; pkill -f "[a]stro dev" 2>/dev/null; pkill -f "[f]swatch -1 -r --exclude static" 2>/dev/null; pkill -f "[m]ake dev" 2>/dev/null; true
 	@echo "stopped"
 
