@@ -1,0 +1,9 @@
+{{template "app" .}}
+{{define "title"}}Dashboard{{end}}
+{{define "content"}}
+<section class="w-full space-y-6">
+{{template "page-header" (dict "Title" "Dashboard")}}
+<div class="grid auto-rows-min gap-4 md:grid-cols-3">{{range list 1 2 3}}<div class="relative aspect-video overflow-hidden rounded-xl border border-zinc-200 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(127,127,127,.08)_10px,rgba(127,127,127,.08)_11px)] dark:border-zinc-700"></div>{{end}}</div>
+<div class="relative min-h-[40vh] overflow-hidden rounded-xl border border-zinc-200 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(127,127,127,.08)_10px,rgba(127,127,127,.08)_11px)] dark:border-zinc-700"></div>
+</section>
+{{end}}

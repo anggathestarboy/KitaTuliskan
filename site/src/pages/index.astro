@@ -1,0 +1,20 @@
+---
+import { collection } from "../cms";
+const [home] = await collection("pages");
+---
+
+<html lang="en">
+   <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width" />
+      <title>{home?.data?.title ?? 'Draft CMS Lite'}</title>
+   </head>
+   <body style="font-family:system-ui;max-width:40rem;margin:4rem auto;padding:0 1rem">
+      <h1>{home?.data?.title ?? "Draft CMS Lite"}</h1>
+      <p>{home?.data?.content}</p>
+
+      <a href="http://127.0.0.1:8000/admin-panel/login" target="_blank">
+         Login Here
+      </a>
+   </body>
+</html>

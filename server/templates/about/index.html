@@ -1,0 +1,8 @@
+{{template "app" .}}
+{{define "title"}}About Draft CMS{{end}}
+{{define "content"}}
+<section class="w-full space-y-6">
+{{template "page-header" (dict "Title" "About Draft CMS" "Action" (safe ``))}}
+{{template "card-open"}}<dl class="grid gap-4 p-4 text-sm sm:grid-cols-3"><div><dt class="text-zinc-500">Version</dt><dd class="font-medium">{{.Version}}</dd></div><div><dt class="text-zinc-500">Go</dt><dd class="font-medium">{{.Go}}</dd></div><div><dt class="text-zinc-500">Database</dt><dd class="font-medium">{{.DB}}</dd></div></dl>{{template "card-close"}}
+</section>
+{{end}}

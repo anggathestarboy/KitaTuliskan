@@ -1,0 +1,45 @@
+{{template "app" .}}
+{{define "title"}}{{.Res.Title}}{{end}}
+{{define "content"}}
+<section class="w-full space-y-6" x-data="{deleteId:null, deleteLabel:''}">
+  {{template "page-header" (dict "Title" .Res.Title "Sub" .ParentValue "Action" (cond .Res.Fields (safe (print `<button type="button" onclick="document.getElementById('create').showModal()" class="inline-flex h-8 items-center gap-2 rounded-lg border border-transparent bg-zinc-800 px-3 text-sm font-medium text-white shadow-xs hover:bg-zinc-700 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-200">New ` (lower (or .Res.One .Res.Title)) `</button>`)) ""))}}
+
+  {{template "card-open"}}
+  <table class="w-full">
+    <thead class="bg-zinc-100 dark:bg-zinc-900"><tr>{{range .Res.Cols}}{{template "th" .}}{{end}}<th class="last:rounded-tr-xl"></th></tr></thead>
+    <tbody>{{$res := .Res}}{{$base := .Base}}{{range .Rows}}{{$row := .}}
+    <tr class="{{template "tr-class"}}">
+      {{range $i, $c := $res.Cols}}<td class="{{template "td-class"}}">
+        {{- $v := index $row $c -}}
+        {{- if and (eq $i 0) $res.Link}}<a href="{{$base}}/{{index $row $res.Link}}" class="font-medium text-zinc-800 hover:underline dark:text-white">{{$v}}</a>
+        {{- else if eq $c "status"}}{{template "status" (print $v)}}
+        {{- else if or (eq $c "is_active") (eq $c "published")}}{{if eq (print $v) "1"}}{{template "badge" (dict "Label" "Active" "Color" "green")}}{{else}}{{template "badge" (dict "Label" "Inactive")}}{{end}}
+        {{- else if eq $c "banned_at"}}{{if $v}}{{template "badge" (dict "Label" "Banned" "Color" "red")}}{{else}}{{template "badge" (dict "Label" "Active" "Color" "green")}}{{end}}
+        {{- else if eq $c "email_verified_at"}}{{if $v}}{{template "badge" (dict "Label" "Verified" "Color" "green")}}{{else}}{{template "badge" (dict "Label" "Unverified" "Color" "amber")}}{{end}}
+        {{- else if eq $c "handle"}}<code class="rounded bg-zinc-100 px-1.5 py-0.5 text-xs dark:bg-zinc-700">{{$v}}</code>
+        {{- else}}{{$v}}{{end}}</td>{{end}}
+      <td class="{{template "td-class"}} text-right"><div x-data="{open:false, pos:{}}" class="inline-block">{{template "ellipsis-trigger"}}
+        {{template "menu-open"}}
+          {{if $res.Link}}{{template "menu-item" (dict "Href" (print $base "/" (index $row $res.Link)) "Label" "Open")}}{{end}}
+          {{template "menu-danger" (dict "Label" "Delete" "Attrs" (safe (print `@click="open=false; deleteId=` (index $row "id") `; deleteLabel='` (index $row (index $res.Cols 0)) `'; $refs.confirm.showModal()"`)))}}
+        {{template "menu-close"}}</div></td>
+    </tr>
+    {{else}}<tr><td colspan="99" class="px-3 py-10 text-center text-sm text-zinc-500">No {{lower $res.Title}} yet.</td></tr>{{end}}</tbody>
+  </table>
+  {{template "card-close"}}
+
+  {{if .Res.Fields}}{{template "modal-open" "create"}}{{template "modal-x"}}
+  <form method="post" action="{{.Base}}" class="space-y-6" @keydown.window.meta.s.prevent="$el.closest('dialog').open && $el.requestSubmit()" @keydown.window.ctrl.s.prevent="$el.closest('dialog').open && $el.requestSubmit()">
+    <h2 class="text-lg font-semibold">New {{lower (or .Res.One .Res.Title)}}</h2>
+    {{range .Res.Fields}}{{template "input" (dict "Label" .Label "Name" .Name "Type" .Type "Required" true "Placeholder" (cond (eq .Name "handle") "blog_posts" ""))}}{{end}}
+    <div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Attrs" (safe `onclick="this.closest('dialog').close()"`))}}{{template "button" (dict "Label" "Save" "Variant" "primary" "Type" "submit")}}</div>
+  </form>{{template "modal-close"}}{{end}}
+
+  <dialog x-ref="confirm" class="m-auto w-full max-w-md rounded-xl border border-zinc-200 bg-white p-4 text-zinc-800 shadow-xl backdrop:bg-zinc-900/40 backdrop:backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" @click.self="$el.close()">
+    <form method="post" :action="'{{.Base}}/' + deleteId + '/delete'" class="space-y-6">
+      <div><h2 class="text-lg font-semibold">Delete <span x-text="deleteLabel"></span>?</h2>{{template "subheading" "This action cannot be undone."}}</div>
+      <div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Attrs" (safe `onclick="this.closest('dialog').close()"`))}}{{template "button" (dict "Label" "Delete" "Variant" "danger" "Type" "submit")}}</div>
+    </form>
+  </dialog>
+</section>
+{{end}}

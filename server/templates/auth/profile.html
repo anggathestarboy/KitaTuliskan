@@ -1,0 +1,21 @@
+{{template "app" .}}
+{{define "title"}}Profile{{end}}
+{{define "content"}}{{template "settings" (merge . "Heading" "Profile" "Subheading" "Update your name and email address" "Items" (list "/settings/profile" "Profile" "/settings/security" "Security" "/settings/appearance" "Appearance"))}}{{end}}
+{{define "settings-body"}}
+<form method="post" action="/settings/profile" class="my-6 w-full space-y-6">
+  {{template "field" (dict "Label" "Name" "Name" "name" "Type" "text" "Value" .User.Name "Required" true "Autocomplete" "name")}}
+  <div>{{template "field" (dict "Label" "Email" "Name" "email" "Type" "email" "Value" .User.Email "Required" true "Autocomplete" "email")}}
+  {{if not .User.EmailVerifiedAt.Valid}}<p class="mt-4 text-sm text-zinc-500">Your email address is unverified. <button form="resend" class="underline">Click here to re-send the verification email.</button></p>{{end}}</div>
+  {{template "primary" "Save"}}
+</form>
+<form id="resend" method="post" action="{{.CP}}/email/verification-notification"></form>
+<div class="mt-10 space-y-6 border-t border-zinc-200 dark:border-zinc-700 pt-6">
+  <h2 class="font-semibold">Delete account</h2><p class="text-sm text-zinc-500">Delete your account and all of its resources</p>
+  <details><summary class="inline-block cursor-pointer rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white">Delete account</summary>
+  <form method="post" action="/settings/profile/delete" class="mt-4 space-y-4">
+    <p class="text-sm">Are you sure you want to delete your account? Please enter your password to confirm.</p>
+    {{template "field" (dict "Label" "Password" "Name" "password" "Type" "password" "Required" true "Autocomplete" "current-password")}}
+    <button class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white">Delete account</button>
+  </form></details>
+</div>
+{{end}}

@@ -1,0 +1,9 @@
+{{template "app" .}}
+{{define "title"}}Sitemap Manager{{end}}
+{{define "content"}}
+<section class="w-full space-y-6">
+{{template "page-header" (dict "Title" "Sitemap Manager" "Action" (safe `<a href="/sitemap.xml" target="_blank" class="inline-flex h-8 items-center rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium shadow-xs hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-700 dark:hover:bg-zinc-600">View /sitemap.xml</a>`))}}
+{{template "card-open"}}<table class="w-full"><thead class="bg-zinc-100 dark:bg-zinc-900"><tr>{{template "th" "Site"}}{{template "th" "Collection"}}{{template "th" "URL"}}{{template "th" "Changefreq"}}{{template "th" "Priority"}}{{template "th" "Status"}}</tr></thead>
+<tbody>{{range .Rows}}<tr class="{{template "tr-class"}}"><td class="{{template "td-class"}}">{{index . "site"}}</td><td class="{{template "td-class"}}">{{index . "collection"}}</td><td class="{{template "td-class"}}">{{index . "url"}}</td><td class="{{template "td-class"}}">{{index . "changefreq"}}</td><td class="{{template "td-class"}}">{{index . "priority"}}</td><td class="{{template "td-class"}}">{{if eq (print (index . "is_active")) "1"}}{{template "badge" (dict "Label" "Active" "Color" "green")}}{{else}}{{template "badge" (dict "Label" "Inactive")}}{{end}}</td></tr>{{else}}<tr><td colspan="6" class="px-3 py-10 text-center text-sm text-zinc-500">Empty. Rows are synced from published entries.</td></tr>{{end}}</tbody></table>{{template "card-close"}}
+</section>
+{{end}}

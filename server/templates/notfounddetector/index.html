@@ -1,0 +1,8 @@
+{{template "app" .}}
+{{define "title"}}404 Detector{{end}}
+{{define "content"}}
+<section class="w-full space-y-6">
+{{template "page-header" (dict "Title" "404 Detector" "Action" (safe ``))}}
+{{template "callout" (dict "Text" "Scans public URLs for broken links. Not yet implemented in lite.")}}
+</section>
+{{end}}

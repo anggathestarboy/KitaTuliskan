@@ -1,0 +1,13 @@
+{{template "app" .}}
+{{define "title"}}Security{{end}}
+{{define "content"}}{{template "settings" (merge . "Heading" "Security" "Subheading" "Update password, two-factor authentication and passkeys" "Items" (list "/settings/profile" "Profile" "/settings/security" "Security" "/settings/appearance" "Appearance"))}}{{end}}
+{{define "settings-body"}}
+<form method="post" action="/settings/security/password" class="my-6 space-y-6">
+  {{template "field" (dict "Label" "Current password" "Name" "current_password" "Type" "password" "Required" true "Autocomplete" "current-password")}}
+  {{template "field" (dict "Label" "New password" "Name" "password" "Type" "password" "Required" true "Autocomplete" "new-password")}}
+  {{template "field" (dict "Label" "Confirm password" "Name" "password_confirmation" "Type" "password" "Required" true "Autocomplete" "new-password")}}
+  {{template "primary" "Save"}}
+</form>
+<div class="mt-10 border-t border-zinc-200 dark:border-zinc-700 pt-6"><h2 class="font-semibold">Two-factor authentication</h2><p class="text-sm text-zinc-500">Not yet available in lite (phase 2).</p></div>
+<div class="mt-10 border-t border-zinc-200 dark:border-zinc-700 pt-6"><h2 class="font-semibold">Passkeys</h2><p class="text-sm text-zinc-500">Not yet available in lite (phase 2).</p></div>
+{{end}}

@@ -1,0 +1,13 @@
+{{define "settings"}}
+<section class="w-full space-y-6">
+<div><h1 class="text-xl font-semibold">Settings</h1>{{template "subheading" "Manage your profile and account settings"}}</div>
+<div class="flex items-start max-md:flex-col">
+  <nav class="me-10 w-full pb-4 md:w-[220px] grid gap-px text-sm">
+    {{$p := .Path}}{{range $i, $v := .Items}}{{if even $i}}<a href="{{$v}}" class="flex h-8 items-center rounded-lg border px-3 font-medium {{if eq $p $v}}border-zinc-200 bg-white text-zinc-800 dark:border-transparent dark:bg-white/7 dark:text-white{{else}}border-transparent text-zinc-500 hover:bg-zinc-800/5 dark:text-white/80 dark:hover:bg-white/7{{end}}">{{index $.Items (inc $i)}}</a>{{end}}{{end}}
+  </nav>
+  <div class="flex-1 self-stretch max-md:pt-6">
+    {{template "heading" .Heading}}{{template "subheading" .Subheading}}
+    {{with .Error}}<div class="mt-3">{{template "callout" (dict "Text" . "Color" "red")}}</div>{{end}}
+    <div class="mt-5 w-full max-w-lg">{{template "settings-body" .}}</div>
+  </div>
+</div></section>{{end}}

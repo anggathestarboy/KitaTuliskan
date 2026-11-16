@@ -1,0 +1,7 @@
+{{template "auth" .}}
+{{define "title"}}Verify email{{end}}
+{{define "subtitle"}}Please verify your email address by clicking on the link we just emailed to you.{{end}}
+{{define "content"}}
+<form method="post" action="{{.CP}}/email/verification-notification" class="space-y-4">{{template "btn" "Resend verification email"}}</form>
+<form method="post" action="{{.CP}}/logout" class="mt-4 text-center"><button class="text-sm text-zinc-500 underline">Log out</button></form>
+{{end}}

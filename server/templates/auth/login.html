@@ -1,0 +1,12 @@
+{{template "auth" .}}
+{{define "title"}}Log in to your account{{end}}
+{{define "subtitle"}}Enter your email and password below to log in{{end}}
+{{define "content"}}
+<form method="post" action="{{.CP}}/login" class="space-y-5">
+  {{template "field" (dict "Label" "Email address" "Name" "email" "Type" "email" "Value" .Email "Required" true "Autocomplete" "email" "Placeholder" "email@example.com")}}
+  <div>{{template "field" (dict "Label" "Password" "Name" "password" "Type" "password" "Required" true "Autocomplete" "current-password" "Placeholder" "Password")}}
+  <a href="{{.CP}}/forgot-password" class="mt-1 block text-right text-xs text-zinc-500 hover:underline">Forgot your password?</a></div>
+  <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="remember" class="rounded"> Remember me</label>
+  {{template "btn" "Log in"}}
+</form>
+{{end}}

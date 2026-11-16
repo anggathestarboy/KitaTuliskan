@@ -1,0 +1,9 @@
+{{template "app" .}}
+{{define "title"}}Activity Log{{end}}
+{{define "content"}}
+<section class="w-full space-y-6">
+{{template "page-header" (dict "Title" "Activity Log" "Action" (safe ``))}}
+{{template "card-open"}}<table class="w-full"><thead class="bg-zinc-100 dark:bg-zinc-900"><tr>{{template "th" "When"}}{{template "th" "User"}}{{template "th" "Action"}}{{template "th" "Description"}}</tr></thead>
+<tbody>{{range .Rows}}<tr class="{{template "tr-class"}}"><td class="{{template "td-class"}}">{{index . "created_at"}}</td><td class="{{template "td-class"}}">{{index . "user_name"}}</td><td class="{{template "td-class"}}">{{index . "action"}}</td><td class="{{template "td-class"}}">{{index . "description"}}</td></tr>{{else}}<tr><td colspan="4" class="px-3 py-10 text-center text-sm text-zinc-500">No activity yet.</td></tr>{{end}}</tbody></table>{{template "card-close"}}
+</section>
+{{end}}

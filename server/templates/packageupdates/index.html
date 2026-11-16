@@ -1,0 +1,8 @@
+{{template "app" .}}
+{{define "title"}}Package Updates{{end}}
+{{define "content"}}
+<section class="w-full space-y-6">
+{{template "page-header" (dict "Title" "Package Updates" "Action" (safe ``))}}
+{{template "card-open"}}<pre class="p-4 text-xs">{{.GoMod}}</pre>{{template "card-close"}}
+</section>
+{{end}}

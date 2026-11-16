@@ -1,0 +1,4 @@
+{{template "app" .}}
+{{define "title"}}Appearance{{end}}
+{{define "content"}}{{template "settings" (merge . "Heading" "Appearance" "Subheading" "Update the appearance settings for your account" "Items" (list "/settings/profile" "Profile" "/settings/security" "Security" "/settings/appearance" "Appearance"))}}{{end}}
+{{define "settings-body"}}<p class="text-sm text-zinc-500">Use the Light / Dark / System switch at the bottom of the sidebar.</p>{{end}}
