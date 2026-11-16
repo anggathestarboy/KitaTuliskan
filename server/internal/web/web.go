@@ -61,10 +61,11 @@ func (a *App) parse() {
 	layouts, _ := filepath.Glob(filepath.Join(templateDir, "layouts", "*.html"))
 	pages, _ := filepath.Glob(filepath.Join(templateDir, "*", "*.html"))
 	for _, p := range pages {
+		p = filepath.ToSlash(p) // Windows: glob mengembalikan "auth\login.html"
 		if strings.Contains(p, "/layouts/") {
 			continue
 		}
-		name := strings.TrimPrefix(p, templateDir+"/")
+		name := strings.TrimPrefix(p, filepath.ToSlash(templateDir)+"/")
 		t, err := template.New(filepath.Base(p)).Funcs(funcs).ParseFiles(append(layouts, p)...)
 		if err != nil {
 			log.Println("template", name, err)
