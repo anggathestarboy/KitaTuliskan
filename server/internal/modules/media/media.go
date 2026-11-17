@@ -1,77 +1,521 @@
-// Package media = app/Modules/Media: asset containers + upload ke storage/<container>/ + serve file.
+// Package media = app/Modules/Media: asset containers + folder/file ops. UI = React island (resources/ts/media),
+// data lewat JSON API di bawah /media/api. Container dibuat lewat CLI: `make media {nama}` (lihat cli.go).
 package media
 
 import (
+	"archive/zip"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"draftcms-lite/internal/web"
 )
 
-const Root = "storage" // = disk "public" di source
+const maxUploadKB = 51200 // validasi 'uploads.*' => max:51200 di source
+
+var (
+	errForbidden = errors.New("Forbidden")
+	errStreamed  = errors.New("response already streamed")
+)
+
+type item struct{ Type, Key string }
+
+func perm(verb, handle string) string { return verb + " " + handle + " assets" }
 
 func Register(mux *http.ServeMux, a *web.App) {
-	a.Page(mux, "/media", "media/index.html", func(r *http.Request) map[string]any {
-		containers, _ := web.Rows(a.DB, `SELECT * FROM asset_containers ORDER BY handle`)
-		c := r.URL.Query().Get("container")
-		if c == "" && len(containers) > 0 {
-			c = containers[0]["handle"].(string)
+	s := Store{a.DB}
+
+	a.Page(mux, "/media", "media/index.html", nil)
+
+	// api membungkus: container dari ?container=, wajib punya "view {container} assets", error → JSON {error}.
+	api := func(pattern string, h func(w http.ResponseWriter, r *http.Request, u *web.User, c Container) (any, error)) {
+		a.Admin(mux, pattern, func(w http.ResponseWriter, r *http.Request) {
+			u := CurrentUser(r)
+			c, err := s.Container(r.URL.Query().Get("container"))
+			if err == nil && !u.Can(perm("view", c.Handle)) {
+				err = errForbidden
+			}
+			var out any
+			if err == nil {
+				out, err = h(w, r, u, c)
+			}
+			reply(w, out, err)
+		})
+	}
+
+	// GET listing: sekaligus bootstrap UI (container yang boleh dilihat user, permission, breadcrumbs dihitung di client).
+	a.Admin(mux, "GET /media/api/listing", func(w http.ResponseWriter, r *http.Request) {
+		u := CurrentUser(r)
+		all, err := s.Containers()
+		var vis []Container
+		for _, c := range all {
+			if u.Can(perm("view", c.Handle)) {
+				vis = append(vis, c)
+			}
 		}
-		assets, _ := web.Rows(a.DB, `SELECT * FROM assets_meta WHERE container=? ORDER BY path`, c)
-		return map[string]any{"Containers": containers, "Container": c, "Assets": assets}
-	})
-	a.Admin(mux, "POST /media/containers", func(w http.ResponseWriter, r *http.Request) {
-		h := r.FormValue("handle")
-		if !web.ValidHandle(h) {
-			web.Flash(w, "Invalid handle.")
-		} else if _, err := a.DB.Exec(`INSERT INTO asset_containers(handle,title,disk,created_at,updated_at) VALUES(?,?,'public',?,?)`, h, r.FormValue("title"), web.Now(), web.Now()); err != nil {
-			web.Flash(w, err.Error())
+		res := map[string]any{"containers": []map[string]string{}, "container": "", "path": "", "folders": []Folder{}, "files": []any{}, "can": map[string]bool{}}
+		cs := make([]map[string]string, 0, len(vis))
+		for _, c := range vis {
+			cs = append(cs, map[string]string{"handle": c.Handle, "title": c.Title})
 		}
-		http.Redirect(w, r, a.CP("/media?container="+h), http.StatusFound)
+		res["containers"] = cs
+		q := r.URL.Query()
+		if h := q.Get("container"); h != "" && !u.Can(perm("view", h)) {
+			if _, e := s.Container(h); e == nil { // container ada tapi tidak boleh dilihat → 403 (mount() di source)
+				reply(w, nil, errForbidden)
+				return
+			}
+		}
+		var cur *Container
+		for i := range vis {
+			if vis[i].Handle == q.Get("container") || (cur == nil && i == 0) {
+				cur = &vis[i]
+			}
+		}
+		if err == nil && cur != nil {
+			p, e := clean(q.Get("path"))
+			if err = e; err == nil {
+				var folders []Folder
+				var files []Asset
+				if t := q.Get("search"); t != "" {
+					folders, files, err = s.Search(*cur, t)
+				} else {
+					folders, files, err = s.List(*cur, p)
+				}
+				out := make([]any, 0, len(files))
+				for _, f := range files {
+					out = append(out, view(a, *cur, f))
+				}
+				res["container"], res["path"], res["folders"], res["files"] = cur.Handle, p, folders, out
+				w := cur.webpConfig()
+				res["compression"] = map[string]any{"enabled": w.Enabled, "minKb": w.MinKB, "maxKb": w.MaxKB, "minQuality": w.MinQ, "maxQuality": w.MaxQ}
+				res["can"] = map[string]bool{
+					"upload": u.Can(perm("upload", cur.Handle)), "editFolders": u.Can(perm("edit folders", cur.Handle)), "edit": u.Can(perm("edit", cur.Handle)),
+					"move": u.Can(perm("move", cur.Handle)), "rename": u.Can(perm("rename", cur.Handle)), "delete": u.Can(perm("delete", cur.Handle)),
+				}
+			}
+		}
+		reply(w, res, err)
 	})
-	a.Admin(mux, "POST /media/upload", func(w http.ResponseWriter, r *http.Request) {
-		c := r.URL.Query().Get("container")
-		if !web.ValidHandle(c) {
-			http.Error(w, "bad container", 400)
+
+	api("POST /media/api/folder", func(w http.ResponseWriter, r *http.Request, u *web.User, c Container) (any, error) {
+		var in struct{ Op, Path, Name string }
+		if err := decode(w, r, &in); err != nil {
+			return nil, err
+		}
+		if !u.Can(perm("edit folders", c.Handle)) {
+			return nil, errForbidden
+		}
+		p, err := clean(in.Path)
+		if err != nil {
+			return nil, err
+		}
+		switch in.Op {
+		case "create":
+			n, err := name(in.Name)
+			if err != nil {
+				return nil, err
+			}
+			return nil, s.CreateFolder(c, join(p, n))
+		case "rename":
+			n, err := name(in.Name)
+			if err != nil {
+				return nil, err
+			}
+			return nil, s.MoveFolder(c, p, join(dir(p), n))
+		}
+		return nil, Error("Unknown operation.")
+	})
+
+	// paste: cut = pindah (juga dipakai drag-drop ke folder), copy = salin. to = folder tujuan.
+	api("POST /media/api/paste", func(w http.ResponseWriter, r *http.Request, u *web.User, c Container) (any, error) {
+		var in struct {
+			Mode  string
+			Items []item
+			To    string
+		}
+		if err := decode(w, r, &in); err != nil {
+			return nil, err
+		}
+		to, err := clean(in.To)
+		if err != nil {
+			return nil, err
+		}
+		cut := in.Mode == "cut"
+		if cut {
+			if !u.Can(perm("move", c.Handle)) {
+				return nil, errForbidden
+			}
+		} else if err := authorize(u, c, in.Items, "edit", "edit folders"); err != nil {
+			return nil, err
+		}
+		moved := 0
+		for _, it := range in.Items {
+			if it.Type == "folder" {
+				k, err := clean(it.Key)
+				if err != nil {
+					return nil, err
+				}
+				if !cut {
+					err = s.CopyFolder(c, k, to)
+				} else if dst := join(to, path.Base(k)); dst != k && to != k && !strings.HasPrefix(to, k+"/") { // pindah ke diri sendiri = no-op
+					err = s.MoveFolder(c, k, dst)
+				} else {
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				moved++
+				continue
+			}
+			as, err := s.Asset(c, it.Key)
+			if err == sql.ErrNoRows {
+				continue
+			} else if err != nil {
+				return nil, err
+			}
+			if !cut {
+				err = s.CopyFile(c, as, to)
+			} else if as.Folder != to {
+				err = s.MoveFile(c, as, to)
+			} else {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			moved++
+		}
+		return map[string]int{"moved": moved}, nil
+	})
+
+	api("POST /media/api/duplicate", func(w http.ResponseWriter, r *http.Request, u *web.User, c Container) (any, error) {
+		return nil, each(w, r, u, c, s, "edit", "edit folders", func(as *Asset, folder string) error {
+			if as != nil {
+				return s.CopyFile(c, *as, as.Folder)
+			}
+			return s.DuplicateFolder(c, folder)
+		})
+	})
+
+	api("POST /media/api/delete", func(w http.ResponseWriter, r *http.Request, u *web.User, c Container) (any, error) {
+		return nil, each(w, r, u, c, s, "delete", "edit folders", func(as *Asset, folder string) error {
+			if as != nil {
+				return s.DeleteFile(c, *as)
+			}
+			return s.DeleteFolder(c, folder)
+		})
+	})
+
+	api("POST /media/api/rename", func(w http.ResponseWriter, r *http.Request, u *web.User, c Container) (any, error) {
+		var in struct{ ID, Name string }
+		if err := decode(w, r, &in); err != nil {
+			return nil, err
+		}
+		if !u.Can(perm("rename", c.Handle)) {
+			return nil, errForbidden
+		}
+		n, err := name(in.Name)
+		if err != nil {
+			return nil, err
+		}
+		as, err := s.Asset(c, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		if as.Extension != "" {
+			n += "." + as.Extension
+		}
+		return nil, s.RenameFile(c, as, n)
+	})
+
+	api("POST /media/api/meta", func(w http.ResponseWriter, r *http.Request, u *web.User, c Container) (any, error) {
+		var in struct{ ID, Title, Alt, Loading string }
+		if err := decode(w, r, &in); err != nil {
+			return nil, err
+		}
+		if !u.Can(perm("edit", c.Handle)) {
+			return nil, errForbidden
+		}
+		if len(in.Title) > 255 || len(in.Alt) > 255 || (in.Loading != "lazy" && in.Loading != "eager") {
+			return nil, Error("The given data was invalid.")
+		}
+		as, err := s.Asset(c, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		return nil, s.SaveMeta(as, in.Title, in.Alt, in.Loading)
+	})
+
+	api("POST /media/api/upload", func(w http.ResponseWriter, r *http.Request, u *web.User, c Container) (any, error) {
+		if !u.Can(perm("upload", c.Handle)) {
+			return nil, errForbidden
+		}
+		folder, err := clean(r.URL.Query().Get("path"))
+		if err != nil {
+			return nil, err
+		}
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			return nil, Error("The upload could not be read.")
+		}
+		var level *int // nilai slider kompresi (0..100); kosong = batas default
+		if v, e := strconv.Atoi(r.FormValue("level")); e == nil {
+			level = &v
+		}
+		// Respons NDJSON: byte sudah diterima, tapi konversi WebP masih berjalan per file, jadi UI diberi progres nyata.
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		fl, _ := w.(http.Flusher)
+		emit := func(v any) {
+			json.NewEncoder(w).Encode(v)
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+		files := r.MultipartForm.File["file"]
+		emit(map[string]any{"event": "start", "total": len(files)})
+		failures := []string{}
+		for i, fh := range files {
+			emit(map[string]any{"event": "file", "index": i, "total": len(files), "name": fh.Filename})
+			if fh.Size > maxUploadKB*1024 {
+				failures = append(failures, fmt.Sprintf("%s must not be greater than %d kilobytes.", fh.Filename, maxUploadKB))
+			} else if err := s.Upload(c, folder, fh, level); err != nil {
+				var me Error
+				if !errors.As(err, &me) {
+					log.Println("media:", err)
+					me = "Something went wrong."
+				}
+				failures = append(failures, me.Error())
+			}
+		}
+		emit(map[string]any{"event": "done", "failures": failures})
+		return nil, errStreamed
+	})
+
+	// download file/folder (folder = zip, di-stream tanpa file sementara).
+	a.Admin(mux, "GET /media/download", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		c, err := s.Container(q.Get("container"))
+		if err == nil && !CurrentUser(r).Can(perm("view", c.Handle)) {
+			err = errForbidden
+		}
+		if err != nil {
+			reply(w, nil, err)
 			return
 		}
-		r.ParseMultipartForm(64 << 20)
-		for _, fh := range r.MultipartForm.File["file"] {
-			name := filepath.Base(fh.Filename) // cegah path traversal
-			if name == "." || name == "" {
-				continue
-			}
-			os.MkdirAll(filepath.Join(Root, c), 0o755)
-			dst, err := os.Create(filepath.Join(Root, c, name))
+		if q.Get("type") == "folder" {
+			p, err := clean(q.Get("key"))
 			if err != nil {
-				continue
+				reply(w, nil, err)
+				return
 			}
-			src, _ := fh.Open()
-			io.Copy(dst, src)
-			src.Close()
-			dst.Close()
-			ext := strings.TrimPrefix(filepath.Ext(name), ".")
-			a.DB.Exec(`INSERT INTO assets_meta(container,folder,basename,filename,extension,path,created_at,updated_at) VALUES(?,'',?,?,?,?,?,?)
-				ON DUPLICATE KEY UPDATE updated_at=VALUES(updated_at)`, c, name, strings.TrimSuffix(name, "."+ext), ext, name, web.Now(), web.Now())
+			zipFolder(w, c, p)
+			return
 		}
-		http.Redirect(w, r, a.CP("/media?container="+c), http.StatusFound)
-	})
-	a.Admin(mux, "POST /media/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
-		var c, p string
-		if a.DB.QueryRow(`SELECT container,path FROM assets_meta WHERE id=?`, r.PathValue("id")).Scan(&c, &p) == nil {
-			os.Remove(filepath.Join(Root, c, filepath.Base(p)))
-			a.DB.Exec(`DELETE FROM assets_meta WHERE id=?`, r.PathValue("id"))
+		as, err := s.Asset(c, q.Get("key"))
+		if err != nil {
+			reply(w, nil, err)
+			return
 		}
-		http.Redirect(w, r, a.CP("/media?container="+c), http.StatusFound)
+		w.Header().Set("Content-Disposition", `attachment; filename*=UTF-8''`+url.PathEscape(as.Basename))
+		serve(w, r, c, as.Path)
 	})
-	// media.file: GET /admin-panel/media/file/{container}/{path...}
+
+	// media.file: file container private, hanya untuk user dengan "view {container} assets". Range (video) ditangani http.ServeContent.
 	a.Admin(mux, "GET /media/file/{container}/{path...}", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, filepath.Join(Root, web.CleanSegment(r.PathValue("container")), path.Clean("/"+r.PathValue("path"))))
+		c, err := s.Container(r.PathValue("container"))
+		if err == nil && !CurrentUser(r).Can(perm("view", c.Handle)) {
+			err = errForbidden
+		}
+		p, perr := clean(r.PathValue("path"))
+		if err != nil || perr != nil || p == "" {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		serve(w, r, c, p)
 	})
-	// publik untuk Astro: /storage/{container}/{path} (= storage:link di source)
-	mux.Handle("GET /storage/", http.StripPrefix("/storage/", http.FileServer(http.Dir(Root))))
+
+	// publik untuk Astro: /storage/{container}/{path} (= storage:link di source); hanya disk public.
+	mux.Handle("GET /storage/", http.StripPrefix("/storage/", http.FileServer(http.Dir(PublicRoot))))
+}
+
+func CurrentUser(r *http.Request) *web.User { return web.CurrentUser(r) }
+
+func serve(w http.ResponseWriter, r *http.Request, c Container, rel string) {
+	f, err := os.Open(c.abs(rel))
+	if err != nil {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil || st.IsDir() {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+	http.ServeContent(w, r, path.Base(rel), st.ModTime(), f)
+}
+
+func zipFolder(w http.ResponseWriter, c Container, p string) {
+	n := path.Base(p)
+	if p == "" {
+		n = c.Handle
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", `attachment; filename*=UTF-8''`+url.PathEscape(n+".zip"))
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+	base := c.abs(p)
+	filepath.WalkDir(base, func(fp string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		rel, _ := filepath.Rel(base, fp)
+		in, err := os.Open(fp)
+		if err != nil {
+			return nil
+		}
+		defer in.Close()
+		if out, err := zw.Create(filepath.ToSlash(rel)); err == nil {
+			io.Copy(out, in)
+		}
+		return nil
+	})
+}
+
+// authorize = authorizeItemTypes: izin per tipe item dicek di depan, sebelum ada yang diubah.
+func authorize(u *web.User, c Container, items []item, filePerm, folderPerm string) error {
+	for _, it := range items {
+		v := filePerm
+		if it.Type == "folder" {
+			v = folderPerm
+		}
+		if !u.Can(perm(v, c.Handle)) {
+			return errForbidden
+		}
+	}
+	return nil
+}
+
+// each menjalankan fn untuk tiap item JSON {items:[{type,key}]}: file → asset terisi, folder → path.
+func each(w http.ResponseWriter, r *http.Request, u *web.User, c Container, s Store, filePerm, folderPerm string, fn func(*Asset, string) error) error {
+	var in struct{ Items []item }
+	if err := decode(w, r, &in); err != nil {
+		return err
+	}
+	if err := authorize(u, c, in.Items, filePerm, folderPerm); err != nil {
+		return err
+	}
+	for _, it := range in.Items {
+		if it.Type == "folder" {
+			p, err := clean(it.Key)
+			if err == nil {
+				err = fn(nil, p)
+			}
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		as, err := s.Asset(c, it.Key)
+		if err == sql.ErrNoRows {
+			continue
+		}
+		if err == nil {
+			err = fn(&as, "")
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func decode(w http.ResponseWriter, r *http.Request, v any) error {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(v); err != nil {
+		return Error("Invalid request.")
+	}
+	return nil
+}
+
+func reply(w http.ResponseWriter, out any, err error) {
+	if errors.Is(err, errStreamed) {
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	var me Error
+	switch {
+	case err == nil:
+		if out == nil {
+			out = map[string]bool{"ok": true}
+		}
+	case errors.Is(err, errForbidden):
+		w.WriteHeader(http.StatusForbidden)
+		out = map[string]string{"error": "Forbidden"}
+	case errors.Is(err, sql.ErrNoRows):
+		w.WriteHeader(http.StatusNotFound)
+		out = map[string]string{"error": "Not found."}
+	case errors.As(err, &me):
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		out = map[string]string{"error": me.Error()}
+	default:
+		log.Println("media:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		out = map[string]string{"error": "Something went wrong."}
+	}
+	json.NewEncoder(w).Encode(out)
+}
+
+// view = bentuk asset untuk UI: accessor AssetMeta (url, copy_url, title, alt, loading, size, mime_type, ...).
+func view(a *web.App, c Container, as Asset) map[string]any {
+	num := func(k string) float64 { v, _ := as.Meta[k].(float64); return v }
+	str := func(k string) string { d, _ := as.Meta["data"].(map[string]any); v, _ := d[k].(string); return v }
+	mt, _ := as.Meta["mime_type"].(string)
+	human := titleCase(strings.NewReplacer("-", " ", "_", " ").Replace(as.Filename))
+	or := func(v, d string) string {
+		if v != "" {
+			return v
+		}
+		return d
+	}
+	u := "/storage/" + escape(c.Handle+"/"+as.Path)
+	if c.Disk != "public" {
+		u = a.CP("/media/file/" + escape(c.Handle+"/"+as.Path))
+	}
+	return map[string]any{
+		"id": as.ID, "basename": as.Basename, "filename": as.Filename, "extension": as.Extension, "folder": as.Folder, "path": as.Path,
+		"size": int64(num("size")), "mime_type": mt, "width": int(num("width")), "height": int(num("height")),
+		"title": or(str("title"), human), "alt": or(str("alt"), human), "loading": or(str("loading"), "lazy"),
+		"url": u, "copy_url": strings.TrimRight(os.Getenv("APP_URL"), "/") + u, "updated_at": as.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+}
+
+func escape(p string) string {
+	parts := strings.Split(p, "/")
+	for i, s := range parts {
+		parts[i] = url.PathEscape(s)
+	}
+	return strings.Join(parts, "/")
+}
+
+// titleCase = Str::title (huruf pertama tiap kata kapital, sisanya kecil), spasi dirapatkan (squish).
+func titleCase(s string) string {
+	w := strings.Fields(s)
+	for i, x := range w {
+		r := []rune(strings.ToLower(x))
+		r[0] = []rune(strings.ToUpper(string(r[0])))[0]
+		w[i] = string(r)
+	}
+	return strings.Join(w, " ")
 }

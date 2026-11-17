@@ -1,7 +1,7 @@
 # make dev   → MySQL check + Go server (auto-reload) + Vite (TS + Tailwind, HMR) + Astro dev, semua dalam satu terminal
 # make build → binary Go + Vite build + Astro static build
 SHELL := /bin/bash
-.PHONY: dev stop build setup install fresh server css site test clean
+.PHONY: dev stop build setup install fresh server css site test clean media media-remove
 
 # make install NAME=Admin EMAIL=admin@example.com PASSWORD=secret1234  → padanan `php artisan draft:setup`
 NAME ?= Admin
@@ -51,3 +51,14 @@ build: setup css
 	cd site && npx astro build
 
 clean: ; rm -rf dist server/static/app.css site/dist
+
+# make media "Blog Images" [TYPE=public|private]  → padanan `php artisan make:media` (judul/TYPE kosong = ditanya interaktif)
+# make media-remove blog_images                   → padanan `php artisan remove:media`
+# Kata setelah `media`/`media-remove` dibaca sebagai argumen, bukan target make. Di akhir file supaya default goal tetap `fresh`.
+ifneq (,$(filter media media-remove,$(firstword $(MAKECMDGOALS))))
+ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+.DEFAULT: ; @:
+endif
+TYPE ?=
+media: setup ; cd server && go run . media -type "$(TYPE)" "$(ARGS)"
+media-remove: setup ; cd server && go run . media:remove "$(ARGS)"

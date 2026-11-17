@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -53,6 +54,20 @@ func main() {
 			setup(app, os.Args[2:])
 		case "fresh": // drop + recreate schema, lalu setup
 			setup(app, os.Args[2:])
+		case "media": // make media {title} = php artisan make:media; flag di depan judul: media -type private "Judul"
+			fs := flag.NewFlagSet("media", flag.ExitOnError)
+			kind := fs.String("type", "", "public | private (kosong = tanya)")
+			fs.Parse(os.Args[2:])
+			if err := media.Make(app, strings.TrimSpace(fs.Arg(0)), *kind); err != nil {
+				log.Fatal(err)
+			}
+		case "media:remove":
+			if len(os.Args) < 3 {
+				log.Fatal("usage: media:remove {handle}")
+			}
+			if err := media.Remove(app, os.Args[2]); err != nil {
+				log.Fatal(err)
+			}
 		}
 		return
 	}
