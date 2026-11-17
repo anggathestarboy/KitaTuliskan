@@ -180,7 +180,7 @@ export function Editor({ cp, handle }: { cp: string; handle: string }) {
 
   return (
     <div className="space-y-6" onClick={() => setMenu(null)}>
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-2 dark:border-zinc-500">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-200 px-4 py-2 dark:border-zinc-700">
         <div className="flex items-center gap-2">
           <svg className="h-6 w-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
             <path stroke="currentColor" strokeLinecap="round" strokeWidth="2" d="M6 4v10m0 0a2 2 0 1 0 0 4m0-4a2 2 0 1 1 0 4m0 0v2m6-16v2m0 0a2 2 0 1 0 0 4m0-4a2 2 0 1 1 0 4m0 0v10m6-16v10m0 0a2 2 0 1 0 0 4m0-4a2 2 0 1 1 0 4m0 0v2" />
