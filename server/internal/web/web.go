@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	texttemplate "text/template"
 	"time"
@@ -332,3 +333,6 @@ func (a *App) ConfirmPassword(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+
+// Itoa: int64 → string, untuk membandingkan id dari PathValue/form dengan id dari DB.
+func Itoa(i int64) string { return strconv.FormatInt(i, 10) }

@@ -1,0 +1,61 @@
+{{template "app" .}}
+{{define "title"}}Sites{{end}}
+{{define "content"}}
+{{/* f = state form modal; open(row) isi dari baris (edit) atau kosong (add). attrs = [{key,value}] → input attr_key[]/attr_value[]. */}}
+<section class="w-full space-y-6" x-data="{deleteId:null, deleteLabel:'', f:{attrs:[]},
+  open(r){ this.f = r ? {...r, attrs:[...r.attrs]} : {id:'', name:'', handle:'', url:'', locale:'', lang:'', attrs:[]}; this.$refs.form.showModal() },
+  slug(){ this.f.handle = this.f.name.toLowerCase().trim().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') }}">
+  {{template "page-header" (dict "Title" "Sites" "Action" (cond .CanConfigure (safe `<button type="button" @click="open()" class="inline-flex h-8 items-center gap-2 rounded-lg border border-transparent bg-zinc-800 px-3 text-sm font-medium text-white shadow-xs hover:bg-zinc-700 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-200">Add site</button>`) ""))}}
+
+  {{template "card-open"}}
+  <table class="w-full">
+    <thead class="bg-zinc-100 dark:bg-zinc-900"><tr>{{template "th" "Name"}}{{template "th" "Handle"}}{{template "th" "URL"}}{{template "th" "Locale"}}{{template "th" "Language"}}<th class="last:rounded-tr-xl"></th></tr></thead>
+    <tbody>{{$base := .Base}}{{$origin := .Origin}}{{$can := .CanConfigure}}{{$n := len .Rows}}{{range $i, $row := .Rows}}{{$isOrigin := eq (print (index $row "id")) (print $origin)}}
+    <tr class="{{template "tr-class"}}">
+      <td class="{{template "td-class"}}"><span class="inline-flex items-center gap-2">{{index $row "name"}}{{if $isOrigin}}{{template "badge" (dict "Label" "Origin" "Color" "amber")}}{{end}}</span></td>
+      <td class="{{template "td-class"}}">{{index $row "handle"}}</td><td class="{{template "td-class"}}">{{index $row "url"}}</td><td class="{{template "td-class"}}">{{index $row "locale"}}</td><td class="{{template "td-class"}}">{{index $row "lang"}}</td>
+      <td class="{{template "td-class"}} text-right whitespace-nowrap">{{if $can}}
+        <form method="post" action="{{$base}}/{{index $row "id"}}/move/up" class="inline"><button type="submit" {{if eq $i 0}}disabled{{end}} class="inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/5 disabled:opacity-30 disabled:hover:bg-transparent dark:text-zinc-300 dark:hover:bg-white/10" aria-label="Move up">{{template "icon-chevron-up"}}</button></form>
+        <form method="post" action="{{$base}}/{{index $row "id"}}/move/down" class="inline"><button type="submit" {{if eq (inc $i) $n}}disabled{{end}} class="inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/5 disabled:opacity-30 disabled:hover:bg-transparent dark:text-zinc-300 dark:hover:bg-white/10" aria-label="Move down">{{template "icon-chevron-down"}}</button></form>
+        <div x-data="{open:false, pos:{}}" class="inline-block">{{template "ellipsis-trigger"}}
+        {{template "menu-open"}}
+          {{template "menu-item" (dict "Label" "Settings" "Icon" "cog" "Attrs" (safe (print `@click="open=false; $dispatch('edit', ` (json $row) `)"`)))}}
+          {{if not $isOrigin}}{{template "menu-danger" (dict "Label" "Delete" "Icon" "trash" "Attrs" (safe (print `@click="open=false; $dispatch('remove', {id:` (index $row "id") `, label:` (json (index $row "name")) `})"`)))}}{{end}}
+        {{template "menu-close"}}</div>{{end}}</td>
+    </tr>
+    {{else}}<tr><td colspan="6" class="px-3 py-10 text-center text-sm text-zinc-500">No sites yet.</td></tr>{{end}}</tbody>
+  </table>
+  {{template "card-close"}}
+
+  <dialog x-ref="form" @edit.window="open($event.detail)" class="m-auto w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-4 text-zinc-800 shadow-xl backdrop:bg-zinc-900/40 backdrop:backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" @click.self="$el.close()">{{template "modal-x"}}
+  <form method="post" action="{{.Base}}" class="space-y-6" @keydown.window.meta.s.prevent="$el.closest('dialog').open && $el.requestSubmit()" @keydown.window.ctrl.s.prevent="$el.closest('dialog').open && $el.requestSubmit()">
+    <h2 class="text-lg font-semibold" x-text="f.id ? 'Edit site' : 'Add site'"></h2>
+    <input type="hidden" name="id" :value="f.id">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {{template "input" (dict "Label" "Name" "Name" "name" "Placeholder" "English" "Required" true "Attrs" (safe `x-model="f.name"`))}}
+      <div class="flex items-end gap-2"><div class="grow">{{template "input" (dict "Label" "Handle" "Name" "handle" "Placeholder" "english" "Required" true "Attrs" (safe (print `x-model="f.handle" :readonly="f.id == ` .Origin `"`)))}}</div>
+        <button type="button" @click="slug()" :disabled="f.id == {{.Origin}}" class="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300" aria-label="Generate handle from name">{{template "icon-refresh"}}</button></div>
+      {{template "input" (dict "Label" "URL" "Name" "url" "Placeholder" "https://example.com/" "Required" true "Attrs" (safe `x-model="f.url"`))}}
+      {{template "input" (dict "Label" "Locale" "Name" "locale" "Placeholder" "en_US" "Required" true "Attrs" (safe `x-model="f.locale"`))}}
+    </div>
+    {{template "select" (dict "Label" "Language" "Name" "lang" "Attrs" (safe `x-model="f.lang" required`) "Placeholder" "Select a language" "Options" .Languages)}}
+    <div class="space-y-3">
+      <div class="flex items-center justify-between"><span class="text-sm text-zinc-500 dark:text-zinc-400">Additional attributes</span>{{template "button" (dict "Label" "Add attribute" "Size" "sm" "Attrs" (safe `@click="f.attrs.push({key:'', value:''})"`))}}</div>
+      <template x-for="(a, i) in f.attrs" :key="i"><div class="flex items-center gap-2">
+        <input name="attr_key" x-model="a.key" placeholder="native_name" class="block h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 shadow-xs placeholder:text-zinc-400 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+        <input name="attr_value" x-model="a.value" placeholder="Deutsch" class="block h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 shadow-xs placeholder:text-zinc-400 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+        <button type="button" @click="f.attrs.splice(i,1)" class="shrink-0 text-zinc-700 hover:text-red-600 dark:text-zinc-300" aria-label="Remove attribute">{{template "icon-trash"}}</button>
+      </div></template>
+    </div>
+    <div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Attrs" (safe `onclick="this.closest('dialog').close()"`))}}{{template "button" (dict "Label" "Save" "Variant" "primary" "Type" "submit")}}</div>
+  </form>
+  </dialog>
+
+  <dialog x-ref="confirm" @remove.window="deleteId=$event.detail.id; deleteLabel=$event.detail.label; $el.showModal()" class="m-auto w-full max-w-md rounded-xl border border-zinc-200 bg-white p-4 text-zinc-800 shadow-xl backdrop:bg-zinc-900/40 backdrop:backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" @click.self="$el.close()">
+    <form method="post" :action="'{{.Base}}/' + deleteId + '/delete'" class="space-y-6">
+      <div><h2 class="text-lg font-semibold">Delete <span x-text="deleteLabel"></span>?</h2>{{template "subheading" "This action cannot be undone."}}</div>
+      <div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Attrs" (safe `onclick="this.closest('dialog').close()"`))}}{{template "button" (dict "Label" "Delete" "Variant" "danger" "Type" "submit")}}</div>
+    </form>
+  </dialog>
+</section>
+{{end}}
