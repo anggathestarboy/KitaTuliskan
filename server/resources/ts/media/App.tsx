@@ -4,7 +4,7 @@ import { type Asset, type Item, type Listing, type Progress, client, needsCompre
 import { UploadProgress } from './Progress';
 import { Compress } from './Compress';
 import { ContextMenu, Entry, type Ctx, type MenuAction, Thumbnail } from './items';
-import { Button, ButtonGroup, Heading, Icon, Input, MiniIcon, Modal, ModalActions, Select, Text, Toasts, cn } from './ui';
+import { Button, ButtonGroup, Heading, Icon, Input, MiniIcon, Modal, ModalActions, Select, Text, Toasts, cn } from '../shared/ui';
 
 type Toast = { id: number; text: string; danger: boolean };
 const parse = (s: string): Item => { const i = s.indexOf(':'); return { type: s.slice(0, i) as Item['type'], key: s.slice(i + 1) }; };

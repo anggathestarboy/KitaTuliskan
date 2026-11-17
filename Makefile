@@ -1,7 +1,7 @@
 # make dev   → MySQL check + Go server (auto-reload) + Vite (TS + Tailwind, HMR) + Astro dev, semua dalam satu terminal
 # make build → binary Go + Vite build + Astro static build
 SHELL := /bin/bash
-.PHONY: dev stop build setup install fresh server css site test clean media media-remove
+.PHONY: dev stop build setup install fresh server css site test clean media media-remove sidebar
 
 # make install NAME=Admin EMAIL=admin@example.com PASSWORD=secret1234  → padanan `php artisan draft:setup`
 NAME ?= Admin
@@ -62,3 +62,7 @@ endif
 TYPE ?=
 media: setup ; cd server && go run . media -type "$(TYPE)" "$(ARGS)"
 media-remove: setup ; cd server && go run . media:remove "$(ARGS)"
+
+# make sidebar [FORCE=1]  → padanan `php artisan admin:sidebar [--force]` (FORCE=1 = reset tree sidebar ke default)
+FORCE ?=
+sidebar: setup ; cd server && go run . sidebar $(if $(FORCE),-force)

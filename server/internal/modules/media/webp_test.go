@@ -75,11 +75,11 @@ func TestOrient(t *testing.T) {
 }
 
 func TestUploadConvertsToWebp(t *testing.T) {
-	d, err := db.Open("127.0.0.1", "3306", "root", "", "draftcms_lite_test", true)
+	d, err := db.Open("127.0.0.1", "3306", "root", "", "draftcms_lite_test_media", true)
 	if err != nil {
 		t.Skip("MySQL tidak tersedia:", err)
 	}
-	t.Cleanup(func() { d.Exec("DROP DATABASE draftcms_lite_test") })
+	t.Cleanup(func() { d.Exec("DROP DATABASE draftcms_lite_test_media") })
 	wd, _ := os.Getwd()
 	os.Chdir(t.TempDir())
 	t.Cleanup(func() { os.Chdir(wd) })

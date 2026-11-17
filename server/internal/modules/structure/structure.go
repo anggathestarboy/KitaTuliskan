@@ -29,9 +29,37 @@ func Load(db *sql.DB, handle, typ string) []Item {
 	return items
 }
 
+// Save = TreeService::save (updateOrCreate). Tidak memakai ON DUPLICATE KEY: UNIQUE (handle,type,locale) tidak
+// berlaku untuk locale NULL di MySQL, jadi tiap simpan akan menambah baris baru dan Load membaca yang terlama.
 func Save(db *sql.DB, handle, typ string, items []Item) error {
-	b, _ := json.Marshal(items)
-	_, err := db.Exec(`INSERT INTO trees(handle,type,tree,created_at,updated_at) VALUES(?,?,?,?,?)
-		ON DUPLICATE KEY UPDATE tree=VALUES(tree), updated_at=VALUES(updated_at)`, handle, typ, string(b), web.Now(), web.Now())
+	if items == nil {
+		items = []Item{}
+	}
+	b, err := json.Marshal(items)
+	if err != nil {
+		return err
+	}
+	var id int64
+	err = db.QueryRow(`SELECT id FROM trees WHERE handle=? AND type=? AND locale IS NULL ORDER BY id LIMIT 1`, handle, typ).Scan(&id)
+	if err == sql.ErrNoRows {
+		_, err = db.Exec(`INSERT INTO trees(handle,type,tree,created_at,updated_at) VALUES(?,?,?,?,?)`, handle, typ, string(b), web.Now(), web.Now())
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`UPDATE trees SET tree=?, updated_at=? WHERE id=?`, string(b), web.Now(), id)
+	return err
+}
+
+// Delete menghapus semua tree (semua locale) milik satu handle.
+func Delete(db *sql.DB, handle, typ string) error {
+	_, err := db.Exec(`DELETE FROM trees WHERE handle=? AND type=?`, handle, typ)
+	return err
+}
+
+// Rename memindahkan tree ke handle baru (dipakai saat handle navigation diubah).
+func Rename(db *sql.DB, from, to, typ string) error {
+	_, err := db.Exec(`UPDATE trees SET handle=? WHERE handle=? AND type=?`, to, from, typ)
 	return err
 }
