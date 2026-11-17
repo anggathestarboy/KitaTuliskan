@@ -42,11 +42,11 @@ type Container struct {
 }
 
 type Asset struct {
-	ID                                              int64
+	ID                                               int64
 	Container, Folder, Basename, Filename, Extension string
-	Path                                            string
-	Meta                                            map[string]any
-	UpdatedAt                                       time.Time
+	Path                                             string
+	Meta                                             map[string]any
+	UpdatedAt                                        time.Time
 }
 
 type Store struct{ DB *sql.DB }
@@ -92,7 +92,9 @@ func dir(p string) string {
 	return d
 }
 
-func (c Container) abs(rel string) string { return filepath.Join(root(c.Disk), c.Handle, filepath.FromSlash(rel)) }
+func (c Container) abs(rel string) string {
+	return filepath.Join(root(c.Disk), c.Handle, filepath.FromSlash(rel))
+}
 
 func (s Store) Container(handle string) (Container, error) {
 	var c Container
@@ -406,7 +408,7 @@ func (s Store) SaveMeta(a Asset, title, alt, loading string) error {
 }
 
 // Upload = uploadFile (tanpa konversi WebP: lihat README, ditunda).
-func (s Store) Upload(c Container, folder string, fh *multipart.FileHeader) (err error) {
+func (s Store) Upload(c Container, folder string, fh *multipart.FileHeader, level *int) (err error) {
 	base := path.Base(strings.ReplaceAll(fh.Filename, `\`, "/"))
 	if base, err = name(base); err != nil {
 		return Error("The file name is invalid.")
@@ -433,6 +435,48 @@ func (s Store) Upload(c Container, folder string, fh *multipart.FileHeader) (err
 	if mt == "application/octet-stream" || mt == "text/plain" {
 		if t := mime.TypeByExtension("." + ext); t != "" {
 			mt = strings.SplitN(t, ";", 2)[0]
+		}
+	}
+	// WebP otomatis (WebpImageConverter di source). level = nilai slider 0..100; nil = batas default (maks 800 KB).
+	if cfg := c.webpConfig(); cfg.Enabled && supportsWebp(mt, ext) {
+		if mt == "image/webp" && ext != "webp" { // isi WebP bernama .png/.jpg: ekstensi disesuaikan, tidak ikut jadi "foto.png" berisi WebP
+			base, ext = strings.TrimSuffix(base, path.Ext(base))+".webp", "webp"
+		}
+		target, q := cfg.MaxKB, cfg.MaxQ
+		if level != nil {
+			target, q = cfg.Target(*level), cfg.Quality(*level)
+		}
+		if !(mt == "image/webp" && fh.Size <= int64(target)*1024) { // WebP yang sudah muat: encode ulang hanya menurunkan kualitas
+			data, rerr := io.ReadAll(src)
+			if rerr != nil {
+				return rerr
+			}
+			conv, cerr := convertWebp(data, cfg, target, q)
+			if cerr != nil {
+				return cerr
+			}
+			if conv != nil {
+				stem := strings.TrimSuffix(base, path.Ext(base))
+				if stem == "" {
+					stem = "image"
+				}
+				wb, uerr := s.uniqueBasename(c, folder, stem+".webp")
+				if uerr != nil {
+					return uerr
+				}
+				if err = os.MkdirAll(c.abs(folder), 0o755); err != nil {
+					return err
+				}
+				if err = os.WriteFile(c.abs(join(folder, wb)), conv.Data, 0o644); err != nil {
+					return err
+				}
+				return s.insert(c, folder, wb, "webp", map[string]any{
+					"size": len(conv.Data), "mime_type": "image/webp", "width": conv.Width, "height": conv.Height,
+					"conversion": map[string]any{"format": "webp", "quality": conv.Quality,
+						"original": map[string]any{"basename": base, "extension": ext, "mime_type": mt, "size": fh.Size}},
+				})
+			}
+			src.Seek(0, io.SeekStart) // animasi: simpan aslinya
 		}
 	}
 	b, err := s.uniqueBasename(c, folder, base)

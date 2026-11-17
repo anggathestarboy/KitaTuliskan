@@ -57,7 +57,7 @@ func TestStore(t *testing.T) {
 		r := httptest.NewRequest("POST", "/", &buf)
 		r.Header.Set("Content-Type", mw.FormDataContentType())
 		r.ParseMultipartForm(1 << 20)
-		return s.Upload(c, folder, r.MultipartForm.File["file"][0])
+		return s.Upload(c, folder, r.MultipartForm.File["file"][0], nil)
 	}
 	if err := upload("", "shell.php", "x"); err == nil {
 		t.Fatal(".php harus diblokir")
@@ -117,4 +117,3 @@ func TestStore(t *testing.T) {
 		t.Fatal("container harus terhapus")
 	}
 }
-

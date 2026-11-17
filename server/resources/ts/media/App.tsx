@@ -1,6 +1,8 @@
 // Media Library = padanan Livewire Index + index.blade.php di source (state komponen Livewire → state React, wire:click → API Go).
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type Asset, type Item, type Listing, client } from './api';
+import { type Asset, type Item, type Listing, type Progress, client, needsCompression } from './api';
+import { UploadProgress } from './Progress';
+import { Compress } from './Compress';
 import { ContextMenu, Entry, type Ctx, type MenuAction, Thumbnail } from './items';
 import { Button, ButtonGroup, Heading, Icon, Input, MiniIcon, Modal, ModalActions, Select, Text, Toasts, cn } from './ui';
 
@@ -22,8 +24,10 @@ export function App({ cp }: { cp: string }) {
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [tick, setTick] = useState(0);
+  const [pending, setPending] = useState<File[]>([]);
+  const [compressing, setCompressing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<number | null>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
   const [dragging, setDragging] = useState(false);
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [renFolder, setRenFolder] = useState<{ path: string; value: string } | null>(null);
@@ -80,15 +84,30 @@ export function App({ cp }: { cp: string }) {
     reload();
   };
 
-  const upload = async (files: File[]) => {
-    if (!files.length || !can?.upload) return;
-    setProgress(0);
+  // send = satu kali kirim ke server; level = nilai slider (kosong = batas default 800 KB). Toast sukses hanya bila tidak ada modal menyusul (notifyUploadResult).
+  const send = async (files: File[], level?: number, quiet = false) => {
+    setProgress({ phase: 'upload', pct: 0 });
     try {
-      const r = await api.upload(cur, data!.path, files, setProgress);
-      r.failures.length ? toast(r.failures.join(' '), true) : toast('Upload complete.');
+      const r = await api.upload(cur, data!.path, files, setProgress, level);
+      if (r.failures.length) toast(r.failures.join(' '), true);
+      else if (!quiet) toast('Upload complete.');
     } catch (e) { fail(e); }
     setProgress(null);
     reload();
+  };
+  // Non-gambar dan gambar <= 800 KB langsung; gambar besar menunggu slider (updatedUploads di source).
+  const upload = async (files: File[]) => {
+    if (!files.length || !can?.upload) return;
+    const big = data!.compression.enabled ? files.filter(needsCompression) : [];
+    const now = files.filter((f) => !big.includes(f));
+    if (now.length) await send(now, undefined, big.length > 0);
+    if (big.length) setPending(big);
+  };
+  const confirmCompress = async (level: number) => {
+    setCompressing(true);
+    await send(pending, level);
+    setCompressing(false);
+    setPending([]);
   };
 
   const ctx: Ctx = {
@@ -180,13 +199,7 @@ export function App({ cp }: { cp: string }) {
         )}
       </div>
 
-      {progress !== null && (
-        <div className="my-3 space-y-3">
-          <div className="flex items-center justify-between text-xs text-zinc-500"><span>Uploading...</span><span>{progress}%</span></div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-white/10"><div className="h-full rounded-full bg-blue-500 transition-[width] duration-300 ease-out" style={{ width: `${progress}%` }} /></div>
-        </div>
-      )}
-
+      {progress && !compressing && <div className="my-3"><UploadProgress p={progress} /></div>}
       <div className="my-3 space-y-3">
         {data.containers.length === 0 ? (
           <div className="rounded-lg border border-dashed border-zinc-300 p-12 text-center text-zinc-400 dark:border-zinc-700">
@@ -323,6 +336,8 @@ export function App({ cp }: { cp: string }) {
           </div>
         )}
       </Modal>
+
+      {pending.length > 0 && <Compress files={pending} cfg={data.compression} busy={compressing} progress={progress} onCancel={() => setPending([])} onConfirm={confirmCompress} />}
 
       <Toasts toasts={toasts} />
     </div>

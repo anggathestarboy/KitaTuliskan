@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"draftcms-lite/internal/web"
@@ -22,7 +23,10 @@ import (
 
 const maxUploadKB = 51200 // validasi 'uploads.*' => max:51200 di source
 
-var errForbidden = errors.New("Forbidden")
+var (
+	errForbidden = errors.New("Forbidden")
+	errStreamed  = errors.New("response already streamed")
+)
 
 type item struct{ Type, Key string }
 
@@ -93,6 +97,8 @@ func Register(mux *http.ServeMux, a *web.App) {
 					out = append(out, view(a, *cur, f))
 				}
 				res["container"], res["path"], res["folders"], res["files"] = cur.Handle, p, folders, out
+				w := cur.webpConfig()
+				res["compression"] = map[string]any{"enabled": w.Enabled, "minKb": w.MinKB, "maxKb": w.MaxKB, "minQuality": w.MinQ, "maxQuality": w.MaxQ}
 				res["can"] = map[string]bool{
 					"upload": u.Can(perm("upload", cur.Handle)), "editFolders": u.Can(perm("edit folders", cur.Handle)), "edit": u.Can(perm("edit", cur.Handle)),
 					"move": u.Can(perm("move", cur.Handle)), "rename": u.Can(perm("rename", cur.Handle)), "delete": u.Can(perm("delete", cur.Handle)),
@@ -263,19 +269,37 @@ func Register(mux *http.ServeMux, a *web.App) {
 		if err := r.ParseMultipartForm(32 << 20); err != nil {
 			return nil, Error("The upload could not be read.")
 		}
+		var level *int // nilai slider kompresi (0..100); kosong = batas default
+		if v, e := strconv.Atoi(r.FormValue("level")); e == nil {
+			level = &v
+		}
+		// Respons NDJSON: byte sudah diterima, tapi konversi WebP masih berjalan per file, jadi UI diberi progres nyata.
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		fl, _ := w.(http.Flusher)
+		emit := func(v any) {
+			json.NewEncoder(w).Encode(v)
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+		files := r.MultipartForm.File["file"]
+		emit(map[string]any{"event": "start", "total": len(files)})
 		failures := []string{}
-		for _, fh := range r.MultipartForm.File["file"] {
+		for i, fh := range files {
+			emit(map[string]any{"event": "file", "index": i, "total": len(files), "name": fh.Filename})
 			if fh.Size > maxUploadKB*1024 {
 				failures = append(failures, fmt.Sprintf("%s must not be greater than %d kilobytes.", fh.Filename, maxUploadKB))
-			} else if err := s.Upload(c, folder, fh); err != nil {
+			} else if err := s.Upload(c, folder, fh, level); err != nil {
 				var me Error
 				if !errors.As(err, &me) {
-					return nil, err
+					log.Println("media:", err)
+					me = "Something went wrong."
 				}
 				failures = append(failures, me.Error())
 			}
 		}
-		return map[string]any{"failures": failures}, nil
+		emit(map[string]any{"event": "done", "failures": failures})
+		return nil, errStreamed
 	})
 
 	// download file/folder (folder = zip, di-stream tanpa file sementara).
@@ -426,6 +450,9 @@ func decode(w http.ResponseWriter, r *http.Request, v any) error {
 }
 
 func reply(w http.ResponseWriter, out any, err error) {
+	if errors.Is(err, errStreamed) {
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	var me Error
 	switch {
