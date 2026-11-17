@@ -1,9 +1,11 @@
-// Padanan NavigationManager + navigation-manager.blade.php. Bagian blueprint (checkbox "Create a blueprint", select Blueprint)
-// belum ada karena modul Blueprints belum dibuat; kolom Blueprint tampil "—".
+// Padanan NavigationManager + navigation-manager.blade.php.
 import { useEffect, useMemo, useState } from 'react';
-import { Cell, Column, Menu, MenuItem, Table, useToasts, ContextMenu, type MenuAction } from '../shared/flux';
-import { Button, Heading, Input, Modal, ModalActions, Text, Toasts } from '../shared/ui';
-import { type Nav, client, slug, visit } from './api';
+import { Cell, Checkbox, Column, Menu, MenuItem, Table, useToasts, ContextMenu, type MenuAction } from '../shared/flux';
+import { Button, Heading, Input, Modal, ModalActions, Select, Text, Toasts } from '../shared/ui';
+import { type BlueprintOption, type Nav, client, slug, visit } from './api';
+
+interface Form { id: number; title: string; handle: string; blueprint: string; createBlueprint: boolean }
+const blank: Form = { id: 0, title: '', handle: '', blueprint: '', createBlueprint: true };
 
 
 const tip = "Add fields to this navigation's blueprint first.";
@@ -13,20 +15,22 @@ export function Manager({ cp }: { cp: string }) {
   const { toasts, toast } = useToasts();
   const [navs, setNavs] = useState<Nav[] | null>(null);
   const [canCreate, setCanCreate] = useState(false);
-  const [form, setForm] = useState<{ id: number; title: string; handle: string } | null>(null);
+  const [form, setForm] = useState<Form | null>(null);
+  const [blueprints, setBlueprints] = useState<BlueprintOption[]>([]);
   const [error, setError] = useState('');
   const [del, setDel] = useState<number | null>(null);
   const [menu, setMenu] = useState<{ id: number; x: number; y: number } | null>(null);
 
-  const load = () => api.list().then((d) => { setNavs(d.navigations); setCanCreate(d.canCreate); }).catch((e) => toast(e.message, true));
+  const load = () => api.list().then((d) => { setNavs(d.navigations); setCanCreate(d.canCreate); setBlueprints(d.blueprints); }).catch((e) => toast(e.message, true));
   useEffect(() => { load(); }, [api]);
 
   const fail = (e: unknown) => toast(e instanceof Error ? e.message : String(e), true);
   const save = async () => {
     if (!form) return;
     try {
-      await api.save(form);
+      const r = await api.save(form);
       setForm(null); setError('');
+      if (r.blueprintCreated) { toast('Navigation saved — add fields to its blueprint so they show up on Edit tree.'); visit(`${cp}/blueprints`); return; }
       toast('Navigation saved.');
       load();
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
@@ -36,7 +40,7 @@ export function Manager({ cp }: { cp: string }) {
     try { await api.remove(id); toast('Navigation deleted.'); } catch (e) { fail(e); }
     load();
   };
-  const edit = (n: Nav) => { if (n.protected) return toast('This navigation is protected and cannot be edited.', true); setError(''); setForm({ id: n.id, title: n.title, handle: n.handle }); };
+  const edit = (n: Nav) => { if (n.protected) return toast('This navigation is protected and cannot be edited.', true); setError(''); setForm({ id: n.id, title: n.title, handle: n.handle, blueprint: n.blueprint, createBlueprint: false }); };
 
   // Terproteksi: Edit/Delete tampil tapi nonaktif (seperti di source), bukan hilang.
   const menuActions = (n: Nav): MenuAction[] => [
@@ -54,7 +58,7 @@ export function Manager({ cp }: { cp: string }) {
           </svg>
           <h1 className="text-2xl font-medium text-zinc-800 dark:text-white">Navigation</h1>
         </div>
-        {canCreate && <Button variant="primary" onClick={() => { setError(''); setForm({ id: 0, title: '', handle: '' }); }}>Add navigation</Button>}
+        {canCreate && <Button variant="primary" onClick={() => { setError(''); setForm({ ...blank }); }}>Add navigation</Button>}
       </div>
 
       <div className="rounded-xl bg-zinc-100 p-1.5 dark:bg-zinc-900">
@@ -110,6 +114,19 @@ export function Manager({ cp }: { cp: string }) {
             </div>
             {error && <p className="text-sm font-medium text-red-500 dark:text-red-400">{error}</p>}
           </div>
+
+          {!form?.id && <Checkbox label="Create a blueprint for this navigation" description="Recommended — you'll add its fields right after saving. Turn off to pick an existing blueprint instead." checked={form?.createBlueprint ?? false} onChange={(v) => setForm({ ...form!, createBlueprint: v })} />}
+
+          {form && !form.createBlueprint && (
+            <>
+              <Select label="Blueprint" value={form.blueprint} onChange={(e) => setForm({ ...form, blueprint: e.target.value })}>
+                <option value="">No blueprint</option>
+                {blueprints.map((b) => <option key={b.handle + b.label} value={b.handle}>{b.label}</option>)}
+              </Select>
+              {blueprints.length === 0 && <Text>No blueprints yet — create one in the Blueprints module first.</Text>}
+            </>
+          )}
+
           <ModalActions>
             <Button variant="filled" onClick={() => setForm(null)}>Cancel</Button>
             <Button variant="primary" type="submit">Save</Button>

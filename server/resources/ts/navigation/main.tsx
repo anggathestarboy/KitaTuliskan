@@ -1,6 +1,7 @@
 // <navigation-manager data-cp="/admin-panel"> dan <navigation-editor data-cp=".." data-handle="sidebar-admin">:
 // custom element supaya React ikut siklus Turbo (mount saat masuk DOM, unmount saat body diganti).
 import { createRoot, type Root } from 'react-dom/client';
+import { Content } from './Content';
 import { Editor } from './Editor';
 import { Manager } from './Manager';
 
@@ -12,4 +13,4 @@ const island = (tag: string, render: (el: HTMLElement) => React.ReactNode) =>
   });
 
 island('navigation-manager', (el) => <Manager cp={el.dataset.cp ?? ''} />);
-island('navigation-editor', (el) => <Editor cp={el.dataset.cp ?? ''} handle={el.dataset.handle ?? ''} />);
+island('navigation-editor', (el) => (el.dataset.mode === 'content' ? <Content cp={el.dataset.cp ?? ''} handle={el.dataset.handle ?? ''} /> : <Editor cp={el.dataset.cp ?? ''} handle={el.dataset.handle ?? ''} />));

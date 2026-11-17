@@ -1,8 +1,8 @@
 // Package navigation = app/Modules/Navigation: daftar navigation + tree editor. UI = React island (resources/ts/navigation),
 // data lewat JSON API di /navigations/api. Tree disimpan lewat package structure (tabel trees).
 //
-// Belum ada Blueprints, jadi hanya mode "legacy tree" di source (navigation terproteksi, mis. sidebar-admin) yang bisa diedit.
-// Mode blueprint (form dari field replicator) menyusul setelah modul Blueprints jadi.
+// Dua mode edit (NavigationTreeEditor): blueprint (form dari field blueprint, lihat content.go) bila blueprint punya field,
+// selain itu "legacy tree" (hanya navigation terproteksi, mis. sidebar-admin).
 package navigation
 
 import (
@@ -36,13 +36,31 @@ type navRow struct {
 	Protected     bool   `json:"protected"`
 	CanEdit       bool   `json:"canEdit"`
 	CanDelete     bool   `json:"canDelete"`
-	HasBlueprint  bool   `json:"hasBlueprint"` // selalu false sampai modul Blueprints ada
+	HasBlueprint  bool   `json:"hasBlueprint"` // blueprint efektif punya minimal satu field
 	BlueprintName string `json:"blueprint"`
+	settings      []byte
+}
+
+const navCols = `id,handle,title,settings`
+
+type scanner interface{ Scan(...any) error }
+
+func scanNav(r scanner) (n navRow, err error) {
+	err = r.Scan(&n.ID, &n.Handle, &n.Title, &n.settings)
+	return
 }
 
 type apiErr string
 
 func (e apiErr) Error() string { return string(e) }
+
+// fieldErrs = gagal validasi form blueprint: `all` berkunci path field ("links.0.title"), `msg` = pesan pertama untuk toast.
+type fieldErrs struct {
+	msg string
+	all map[string]string
+}
+
+func (e fieldErrs) Error() string { return e.msg }
 
 var errForbidden = errors.New("Forbidden")
 
@@ -59,6 +77,7 @@ func canView(u *web.User, h string) bool { return u.Can("view "+h+" navigation")
 func reply(w http.ResponseWriter, out any, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	var ae apiErr
+	var fe fieldErrs
 	switch {
 	case err == nil:
 		if out == nil {
@@ -70,6 +89,9 @@ func reply(w http.ResponseWriter, out any, err error) {
 	case errors.Is(err, sql.ErrNoRows):
 		w.WriteHeader(http.StatusNotFound)
 		out = map[string]string{"error": "Not found."}
+	case errors.As(err, &fe):
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		out = map[string]any{"error": fe.msg, "errors": fe.all}
 	case errors.As(err, &ae):
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		out = map[string]string{"error": ae.Error()}
@@ -89,9 +111,8 @@ func decode(w http.ResponseWriter, r *http.Request, v any) error {
 }
 
 func Register(mux *http.ServeMux, a *web.App) {
-	byHandle := func(h string) (n navRow, err error) {
-		err = a.DB.QueryRow(`SELECT id,handle,title FROM navigations WHERE handle=?`, h).Scan(&n.ID, &n.Handle, &n.Title)
-		return
+	byHandle := func(h string) (navRow, error) {
+		return scanNav(a.DB.QueryRow(`SELECT `+navCols+` FROM navigations WHERE handle=?`, h))
 	}
 
 	a.Page(mux, "/navigations", "navigation/index.html", nil)
@@ -105,13 +126,17 @@ func Register(mux *http.ServeMux, a *web.App) {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
-		a.Render(w, r, "navigation/edit.html", map[string]any{"Handle": n.Handle, "NavTitle": n.Title})
+		mode := "tree"
+		if b := blueprintOf(a, n); b != nil && len(b.Fields) > 0 {
+			mode = "content"
+		}
+		a.Render(w, r, "navigation/edit.html", map[string]any{"Handle": n.Handle, "NavTitle": n.Title, "Mode": mode})
 	})
 
 	// GET list: semua navigation (urut judul); tombol/aksi per baris sesuai izin user.
 	a.Admin(mux, "GET /navigations/api/list", func(w http.ResponseWriter, r *http.Request) {
 		u := web.CurrentUser(r)
-		rows, err := a.DB.Query(`SELECT id,handle,title FROM navigations ORDER BY title`)
+		rows, err := a.DB.Query(`SELECT ` + navCols + ` FROM navigations ORDER BY title`)
 		if err != nil {
 			reply(w, nil, err)
 			return
@@ -119,19 +144,22 @@ func Register(mux *http.ServeMux, a *web.App) {
 		defer rows.Close()
 		list := []navRow{}
 		for rows.Next() {
-			var n navRow
-			rows.Scan(&n.ID, &n.Handle, &n.Title)
+			n, _ := scanNav(rows)
 			n.Protected, n.CanEdit, n.CanDelete = isProtected(n.Handle), canEdit(u, n.Handle), canDelete(u, n.Handle)
+			if b := blueprintOf(a, n); b != nil {
+				n.BlueprintName, n.HasBlueprint = b.Handle, len(b.Fields) > 0
+			}
 			list = append(list, n)
 		}
-		reply(w, map[string]any{"navigations": list, "canCreate": u.Can("configure navigation")}, rows.Err())
+		reply(w, map[string]any{"navigations": list, "canCreate": u.Can("configure navigation"), "blueprints": blueprintOptions(a)}, rows.Err())
 	})
 
 	// POST save: buat/ubah navigation (judul + handle). Yang terproteksi tidak bisa diubah sama sekali.
 	a.Admin(mux, "POST /navigations/api/save", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
-			ID            int64
-			Handle, Title string
+			ID                       int64
+			Handle, Title, Blueprint string
+			CreateBlueprint          bool
 		}
 		if err := decode(w, r, &in); err != nil {
 			reply(w, nil, err)
@@ -140,7 +168,8 @@ func Register(mux *http.ServeMux, a *web.App) {
 		u := web.CurrentUser(r)
 		var old navRow
 		if in.ID != 0 {
-			if err := a.DB.QueryRow(`SELECT id,handle,title FROM navigations WHERE id=?`, in.ID).Scan(&old.ID, &old.Handle, &old.Title); err != nil {
+			var err error
+			if old, err = scanNav(a.DB.QueryRow(`SELECT `+navCols+` FROM navigations WHERE id=?`, in.ID)); err != nil {
 				reply(w, nil, err)
 				return
 			}
@@ -171,6 +200,24 @@ func Register(mux *http.ServeMux, a *web.App) {
 			reply(w, nil, apiErr("The handle may only contain lowercase letters, numbers, dashes and underscores."))
 			return
 		}
+		// "Create a blueprint" hanya saat buat baru (di edit tidak ada centangnya); selain itu blueprint opsional tapi harus ada.
+		create := in.CreateBlueprint && in.ID == 0
+		bpHandle := strings.TrimSpace(in.Blueprint)
+		if create {
+			bpHandle = ""
+		} else if bpHandle != "" {
+			var n int
+			a.DB.QueryRow(`SELECT COUNT(*) FROM blueprints WHERE handle=?`, bpHandle).Scan(&n)
+			if n == 0 {
+				reply(w, nil, apiErr("The selected blueprint is invalid."))
+				return
+			}
+		}
+		var picked any
+		if bpHandle != "" {
+			picked = bpHandle
+		}
+		settings, _ := json.Marshal(map[string]any{"blueprint": picked})
 		var taken int
 		a.DB.QueryRow(`SELECT COUNT(*) FROM navigations WHERE handle=? AND id<>?`, handle, in.ID).Scan(&taken)
 		if taken > 0 {
@@ -180,14 +227,20 @@ func Register(mux *http.ServeMux, a *web.App) {
 		now := web.Now()
 		var err error
 		if in.ID == 0 {
-			_, err = a.DB.Exec(`INSERT INTO navigations(handle,title,settings,created_at,updated_at) VALUES(?,?,'{"blueprint":null}',?,?)`, handle, title, now, now)
+			_, err = a.DB.Exec(`INSERT INTO navigations(handle,title,settings,created_at,updated_at) VALUES(?,?,?,?,?)`, handle, title, string(settings), now, now)
 		} else {
-			if _, err = a.DB.Exec(`UPDATE navigations SET handle=?, title=?, updated_at=? WHERE id=?`, handle, title, now, in.ID); err == nil && handle != old.Handle {
+			if _, err = a.DB.Exec(`UPDATE navigations SET handle=?, title=?, settings=?, updated_at=? WHERE id=?`, handle, title, string(settings), now, in.ID); err == nil && handle != old.Handle {
 				err = structure.Rename(a.DB, old.Handle, handle, "navigation")
 			}
 		}
-		reply(w, nil, err)
+		created := false
+		if err == nil && create {
+			created, err = createBlueprint(a, handle)
+		}
+		reply(w, map[string]any{"ok": true, "blueprintCreated": created}, err)
 	})
+
+	registerContent(mux, a, byHandle)
 
 	a.Admin(mux, "POST /navigations/api/delete", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ ID int64 }
@@ -195,8 +248,8 @@ func Register(mux *http.ServeMux, a *web.App) {
 			reply(w, nil, err)
 			return
 		}
-		var n navRow
-		if err := a.DB.QueryRow(`SELECT id,handle,title FROM navigations WHERE id=?`, in.ID).Scan(&n.ID, &n.Handle, &n.Title); err != nil {
+		n, err := scanNav(a.DB.QueryRow(`SELECT `+navCols+` FROM navigations WHERE id=?`, in.ID))
+		if err != nil {
 			reply(w, nil, err)
 			return
 		}
@@ -246,7 +299,7 @@ func Register(mux *http.ServeMux, a *web.App) {
 			reply(w, nil, errForbidden)
 			return
 		}
-		if !isProtected(n.Handle) { // tanpa blueprint, hanya navigation terproteksi yang punya editor tree
+		if b := blueprintOf(a, n); (b != nil && len(b.Fields) > 0) || !isProtected(n.Handle) { // editor tree hanya untuk navigation terproteksi tanpa field blueprint
 			reply(w, nil, apiErr("This navigation has no blueprint yet."))
 			return
 		}

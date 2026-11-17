@@ -108,6 +108,39 @@ func Register(mux *http.ServeMux, a *web.App) {
 		reply(w, res, err)
 	})
 
+	// GET assets?ids=1,2: data asset (lintas container) untuk field "assets" modul lain; hanya container yang boleh dilihat user.
+	a.Admin(mux, "GET /media/api/assets", func(w http.ResponseWriter, r *http.Request) {
+		u := CurrentUser(r)
+		var ids []any
+		marks := []string{}
+		for _, p := range strings.Split(r.URL.Query().Get("ids"), ",") {
+			if n, err := strconv.ParseInt(p, 10, 64); err == nil && len(ids) < 500 {
+				ids, marks = append(ids, n), append(marks, "?")
+			}
+		}
+		out := []any{}
+		var err error
+		if len(ids) > 0 {
+			var found []Asset
+			if found, err = s.assets("id IN ("+strings.Join(marks, ",")+")", ids...); err == nil {
+				cs := map[string]*Container{}
+				for _, f := range found {
+					c, ok := cs[f.Container]
+					if !ok {
+						if cc, e := s.Container(f.Container); e == nil && u.Can(perm("view", cc.Handle)) {
+							c = &cc
+						}
+						cs[f.Container] = c
+					}
+					if c != nil {
+						out = append(out, view(a, *c, f))
+					}
+				}
+			}
+		}
+		reply(w, map[string]any{"assets": out}, err)
+	})
+
 	api("POST /media/api/folder", func(w http.ResponseWriter, r *http.Request, u *web.User, c Container) (any, error) {
 		var in struct{ Op, Path, Name string }
 		if err := decode(w, r, &in); err != nil {

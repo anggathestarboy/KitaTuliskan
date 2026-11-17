@@ -35,14 +35,47 @@ func Save(db *sql.DB, handle, typ string, items []Item) error {
 	if items == nil {
 		items = []Item{}
 	}
-	b, err := json.Marshal(items)
+	return put(db, handle, typ, "", items)
+}
+
+// LoadData/SaveData = tree sebagai objek per locale (mode blueprint Navigation: nilai field, bukan daftar item). locale "" = NULL.
+func LoadData(db *sql.DB, handle, typ, locale string) map[string]any {
+	var raw sql.NullString
+	where, args := byLocale(locale)
+	db.QueryRow(`SELECT tree FROM trees WHERE handle=? AND type=? AND `+where+` ORDER BY id LIMIT 1`, append([]any{handle, typ}, args...)...).Scan(&raw)
+	out := map[string]any{}
+	json.Unmarshal([]byte(raw.String), &out) // bukan objek (mis. list item lama) → kosong
+	return out
+}
+
+func SaveData(db *sql.DB, handle, typ, locale string, data map[string]any) error {
+	if data == nil {
+		data = map[string]any{}
+	}
+	return put(db, handle, typ, locale, data)
+}
+
+func byLocale(locale string) (string, []any) {
+	if locale == "" {
+		return "locale IS NULL", nil
+	}
+	return "locale=?", []any{locale}
+}
+
+func put(db *sql.DB, handle, typ, locale string, v any) error {
+	b, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
+	where, args := byLocale(locale)
 	var id int64
-	err = db.QueryRow(`SELECT id FROM trees WHERE handle=? AND type=? AND locale IS NULL ORDER BY id LIMIT 1`, handle, typ).Scan(&id)
+	err = db.QueryRow(`SELECT id FROM trees WHERE handle=? AND type=? AND `+where+` ORDER BY id LIMIT 1`, append([]any{handle, typ}, args...)...).Scan(&id)
 	if err == sql.ErrNoRows {
-		_, err = db.Exec(`INSERT INTO trees(handle,type,tree,created_at,updated_at) VALUES(?,?,?,?,?)`, handle, typ, string(b), web.Now(), web.Now())
+		var loc any
+		if locale != "" {
+			loc = locale
+		}
+		_, err = db.Exec(`INSERT INTO trees(handle,type,locale,tree,created_at,updated_at) VALUES(?,?,?,?,?,?)`, handle, typ, loc, string(b), web.Now(), web.Now())
 		return err
 	}
 	if err != nil {

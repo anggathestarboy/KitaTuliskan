@@ -9,7 +9,7 @@ export const Badge = ({ children }: { children: ReactNode }) => (
 );
 
 // flux:checkbox: kotak 1.125rem, centang pakai warna accent.
-export function Checkbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+export function Checkbox({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex cursor-pointer items-start gap-3 text-sm">
       <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
@@ -17,7 +17,7 @@ export function Checkbox({ label, checked, onChange }: { label: string; checked:
         checked ? 'border-black/10 bg-[var(--color-accent)] text-[var(--color-accent-foreground)] dark:border-transparent' : 'border-zinc-300 bg-white dark:border-white/10 dark:bg-white/10')}>
         {checked && <svg viewBox="0 0 16 16" fill="currentColor" className="size-4"><path fillRule="evenodd" clipRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" /></svg>}
       </span>
-      <span className="font-medium text-zinc-800 dark:text-white">{label}</span>
+      <span><span className="font-medium text-zinc-800 dark:text-white">{label}</span>{description && <span className="mt-1 block text-sm text-zinc-500 dark:text-white/60">{description}</span>}</span>
     </label>
   );
 }

@@ -1,4 +1,4 @@
 {{template "app" .}}
 {{define "title"}}{{.NavTitle}}{{end}}
-{{define "content"}}<navigation-editor data-cp="{{.CP}}" data-handle="{{.Handle}}"></navigation-editor>
+{{define "content"}}<navigation-editor data-cp="{{.CP}}" data-handle="{{.Handle}}" data-mode="{{.Mode}}"></navigation-editor>
 {{vite "resources/ts/navigation/main.tsx"}}{{end}}
