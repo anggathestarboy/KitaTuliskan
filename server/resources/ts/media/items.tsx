@@ -25,6 +25,10 @@ export function Thumbnail({ asset, fit = 'object-cover', interactive = false }: 
       </div>
     );
   }
+  if (asset.mime_type.startsWith('audio/')) {
+    if (interactive) return <div className="flex w-full flex-col items-center gap-4 px-2"><Icon name="musical-note" className="size-16 text-zinc-400" /><audio src={asset.url} controls preload="metadata" className="w-full" /></div>;
+    return <Icon name="musical-note" className="size-1/2 text-zinc-400" />;
+  }
   if (asset.extension === 'pdf') return <PdfIcon />;
   return <Icon name="document" className="size-1/2 text-zinc-400" />;
 }
@@ -89,7 +93,7 @@ export function Entry({ row, mode, ctx }: { row: Row; mode: 'grid' | 'list'; ctx
     );
   }
   return (
-    <div {...common} className={cn('group flex items-center gap-3 px-2 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800', sel && 'bg-blue-50 dark:bg-blue-950/40', over && 'bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-950')}>
+    <div {...common} className={cn('group flex items-center gap-3 px-2 py-2', sel ? 'bg-blue-100 ring-1 ring-inset ring-blue-400 dark:bg-blue-500/25 dark:ring-blue-500' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800', over && 'bg-blue-50 ring-2 ring-blue-400 dark:bg-blue-950')}>
       {folder
         ? <div className="flex size-8 shrink-0 items-center justify-center">{folderSvg('')}</div>
         : <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-zinc-100 dark:bg-zinc-800"><Thumbnail asset={row.asset} /></div>}

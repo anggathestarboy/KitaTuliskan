@@ -194,7 +194,7 @@ export function App({ cp }: { cp: string }) {
           </div>
         ) : (
           <div>
-            <div className="overflow-x-auto rounded-t-lg bg-zinc-100 px-4 py-2 dark:bg-zinc-800">
+            <div className="overflow-x-auto rounded-t-lg bg-zinc-100 px-4 py-2 dark:bg-zinc-900">
               <div className="flex w-max">
                 {[{ name: 'Home', path: '' }, ...crumbs].map((c, i, all) => (
                   <div key={c.path} className="group/breadcrumb flex items-center text-sm font-medium">
