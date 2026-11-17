@@ -72,11 +72,11 @@ func TestProtected(t *testing.T) {
 
 // Butuh MySQL lokal; dilewati kalau tidak ada.
 func TestStoreSaveIsUpsert(t *testing.T) {
-	d, err := db.Open("127.0.0.1", "3306", "root", "", "draftcms_lite_test", true)
+	d, err := db.Open("127.0.0.1", "3306", "root", "", "draftcms_lite_test_nav", true)
 	if err != nil {
 		t.Skip("MySQL tidak tersedia:", err)
 	}
-	t.Cleanup(func() { d.Exec("DROP DATABASE draftcms_lite_test") })
+	t.Cleanup(func() { d.Exec("DROP DATABASE draftcms_lite_test_nav") })
 	for i, title := range []string{"one", "two", "three"} {
 		if err := structure.Save(d, "m", "navigation", []structure.Item{{ID: "i", Type: "internal", Title: title}}); err != nil {
 			t.Fatal(i, err)

@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	texttemplate "text/template"
 	"time"
@@ -351,3 +352,6 @@ func (a *App) resolvePages(items []SidebarItem) {
 		a.resolvePages(items[i].Children)
 	}
 }
+
+// Itoa: int64 → string, untuk membandingkan id dari PathValue/form dengan id dari DB.
+func Itoa(i int64) string { return strconv.FormatInt(i, 10) }
