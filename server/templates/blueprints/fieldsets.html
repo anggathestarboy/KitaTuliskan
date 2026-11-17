@@ -1,0 +1,30 @@
+{{template "app" .}}
+{{define "title"}}Fieldsets{{end}}
+{{define "content"}}
+<section class="w-full space-y-6" x-data="{deleteId:null, ctx:null, ctxX:0, ctxY:0}" @click="ctx=null">
+  {{template "page-header" (dict "Title" "Fieldsets" "Action" (safe (print `<a href="` .CP `/fieldsets/create" class="inline-flex h-8 items-center rounded-lg border border-transparent bg-zinc-800 px-3 text-sm font-medium text-white shadow-xs hover:bg-zinc-700 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-200">New fieldset</a>`)))}}
+
+  {{template "card-open"}}
+  <table class="w-full">
+    <thead class="bg-zinc-100 dark:bg-zinc-900"><tr>{{template "th" "Handle"}}{{template "th" "Fields"}}<th class="last:rounded-tr-xl"></th></tr></thead>
+    <tbody>{{$cp := .CP}}{{range .Rows}}{{$id := index . "id"}}
+    <tr class="{{template "tr-class"}}" @contextmenu.prevent.stop="ctx={{$id}}; ctxX=$event.clientX-20; ctxY=$event.clientY+10">
+      <td class="{{template "td-class"}}">{{index . "handle"}}</td><td class="{{template "td-class"}}">{{index . "fields"}}</td>
+      <td class="{{template "td-class"}} text-right"><div x-data="{open:false, pos:{}}" class="inline-block">{{template "ellipsis-trigger"}}{{template "menu-open"}}
+          {{template "menu-item" (dict "Label" "Edit" "Icon" "pencil" "Href" (print $cp "/fieldsets/" $id "/edit"))}}
+          {{template "menu-danger" (dict "Label" "Delete" "Icon" "trash" "Attrs" (safe (print `@click="open=false; deleteId=` $id `; $refs.confirm.showModal()"`)))}}
+        {{template "menu-close"}}</div>
+        {{/* menu klik kanan = contextMenu di source */}}
+        <div x-show="ctx==={{$id}}" x-cloak @click.outside="ctx=null" :style="{left: ctxX+'px', top: ctxY+'px'}" class="fixed z-50 w-40 rounded-md border border-zinc-200 bg-white py-1 text-left shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+          <a href="{{$cp}}/fieldsets/{{$id}}/edit" class="block w-full px-3 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">Edit</a>
+          <button type="button" @click="ctx=null; deleteId={{$id}}; $refs.confirm.showModal()" class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-zinc-100 dark:hover:bg-zinc-800">Delete</button>
+        </div></td>
+    </tr>
+    {{else}}<tr><td colspan="3" class="px-3 py-10 text-center text-sm text-zinc-500">No fieldsets yet.</td></tr>{{end}}</tbody>
+  </table>
+  {{template "card-close"}}
+
+  {{template "fe-confirm" (dict "Ref" "confirm" "Title" "Delete this fieldset?" "Text" "This cannot be undone." "Attrs" (safe (print `@click="$refs.del.action='` .CP `/fieldsets/'+deleteId+'/delete'; $refs.del.submit()"`)))}}
+  <form x-ref="del" method="post" class="hidden"></form>
+</section>
+{{end}}

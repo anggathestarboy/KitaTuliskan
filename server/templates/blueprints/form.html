@@ -1,0 +1,137 @@
+{{template "app" .}}
+{{define "title"}}{{if .State.ID}}Edit blueprint{{else}}New blueprint{{end}}{{end}}
+{{define "content"}}
+{{template "field-builder-js"}}
+<section class="w-full max-w-7xl space-y-6" x-data="fieldBuilder({{json .State}}, {{json .Lookups}}, {{json .Editor}}, {flags: {{json .CollectionFlags}}})"
+  @keydown.window.ctrl.s.prevent="$refs.form.requestSubmit()" @keydown.window.meta.s.prevent="$refs.form.requestSubmit()">
+  {{template "page-header" (dict "Title" (cond .State.ID "Edit blueprint" "New blueprint"))}}
+
+  <form x-ref="form" method="post" action="{{.CP}}/blueprints/save" class="space-y-6">
+    <input type="hidden" name="state" :value="payload()">
+    <div class="grid gap-4">
+      {{if .Namespaces}}
+      <div>{{template "fe-label" "Namespace"}}<select x-model="namespace" class="{{template "fe-cls"}}"><option value="">No namespace</option>{{range .Namespaces}}<option value="{{.Value}}" {{if eq .Value $.State.Namespace}}selected{{end}}>{{.Label}}</option>{{end}}</select>{{template "fe-err" "'namespace'"}}</div>
+      {{else}}<div><p class="text-sm font-medium">Namespace</p><p class="text-sm text-zinc-500">No collections yet — create one in the Collections module first.</p></div>{{end}}
+
+      <div>{{template "fe-label" "Handle"}}<input x-model="handle" required class="{{template "fe-cls"}}">{{template "fe-err" "'handle'"}}</div>
+
+      {{if .Templates}}
+      <div>{{template "fe-label" "Template"}}<select x-model="template" class="{{template "fe-cls"}}"><option value="">No template</option>{{range .Templates}}<option value="{{.}}" {{if eq . $.State.Template}}selected{{end}}>{{.}}</option>{{end}}</select>
+        <p class="mt-1 text-xs text-zinc-500">The view used to render entries using this blueprint.</p>{{template "fe-err" "'template'"}}</div>
+      {{else}}<div><p class="text-sm font-medium">Template</p><p class="text-sm text-zinc-500">No templates yet — add an .astro file under site/src/pages first.</p></div>{{end}}
+    </div>
+
+    <div class="space-y-3">
+      {{template "fe-toolbar" (dict "AddLabel" "Add tab" "AddAttrs" (safe `@click="addTab()"`))}}
+      {{template "fe-err" "'fields'"}}
+
+      <template x-for="(tab, ti) in tabs" :key="ti">
+        <div class="space-y-3 rounded-xl border border-gray-200 bg-gray-200 p-2 dark:border-gray-700 dark:bg-zinc-950">
+          <div class="rounded-xl bg-white p-3 dark:bg-zinc-800">
+            {{/* tab header: mode edit (label/handle) atau tampilan biasa */}}
+            <template x-if="ti !== 0 && editingTab === ti">
+              <div class="mb-3">
+                <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <input x-model="tab.display" placeholder="Label" class="{{template "fe-cls"}} !h-8 w-full flex-1 sm:w-auto">
+                  <input x-model="tab.handle" placeholder="handle" class="{{template "fe-cls"}} !h-8 w-full flex-1 sm:w-auto">
+                  <button type="button" class="inline-flex size-8 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-800/5 dark:text-zinc-300 dark:hover:bg-white/10" title="Regenerate from label" @click="tab.handle = slug(tab.display)">{{template "icon-refresh"}}</button>
+                  {{template "button" (dict "Label" "Cancel" "Size" "sm" "Attrs" (safe `@click="cancelTab(ti)"`))}}
+                  {{template "button" (dict "Label" "Done" "Size" "sm" "Variant" "primary" "Attrs" (safe `@click="confirmTab()"`))}}
+                </div>
+                {{template "fe-err" "'tabs.'+ti+'.handle'"}}
+              </div>
+            </template>
+            <template x-if="!(ti !== 0 && editingTab === ti)">
+              <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex min-w-0 flex-wrap items-center gap-1">
+                  <template x-if="ti !== 0"><div x-data="{open:false, pos:{}}" class="inline-block">{{template "ellipsis-trigger"}}{{template "menu-open"}}
+                    {{template "menu-item" (dict "Label" "Edit" "Icon" "pencil" "Attrs" (safe `@click="open=false; editingTab=ti"`))}}
+                    {{template "menu-danger" (dict "Label" "Delete" "Icon" "trash" "Attrs" (safe `@click="open=false; deleteTab=ti; $refs.confirmTab.showModal()"`))}}
+                  {{template "menu-close"}}</div></template>
+                  <span x-show="tab.handle === 'sidebar'" class="inline-flex items-center gap-0.5 rounded-2xl bg-indigo-300 px-2 py-0.5 text-[10px] text-zinc-900">Sidebar</span>
+                  <span x-show="tab.handle !== 'sidebar'" class="rounded-2xl bg-orange-300 px-2 py-0.5 text-[10px] text-zinc-900">Tab</span>
+                  <span class="text-sm font-medium" x-text="tab.display || 'Main'"></span>
+                </div>
+                <div class="flex gap-2">
+                  <template x-if="tab.handle === 'sidebar'">{{template "button" (dict "Label" "Add field" "Size" "sm" "Attrs" (safe `@click="addField(tab.handle, '')"`))}}</template>
+                  <template x-if="tab.handle !== 'sidebar'">{{template "button" (dict "Label" "Add section" "Size" "sm" "Variant" "ghost" "Attrs" (safe `@click="addSection(ti)"`))}}</template>
+                </div>
+              </div>
+            </template>
+
+            {{/* field tanpa section */}}
+            <div class="space-y-3" @dragover.prevent @drop.prevent="dropTop(null, tab.handle, '')">
+              <template x-for="f0 in groupFields(tab.handle, '')" :key="f0._uid">
+                {{template "field-editor" (dict "Depth" 0 "F" "f0" "S" "fields" "P" "('fields.'+fields.indexOf(f0))" "Top" true "TabX" "tab.handle" "SecX" "''")}}
+              </template>
+            </div>
+            <p x-show="!groupFields(tab.handle, '').length && !tab.sections.length" class="text-sm text-zinc-500">No fields in this tab yet.</p>
+
+            {{/* sections */}}
+            <div class="space-y-3">
+              <template x-for="(sec, si) in tab.sections" :key="si">
+                <div class="mt-3 space-y-3 rounded-md border border-dashed border-zinc-300 p-3 dark:border-zinc-600" :draggable="dragSec && dragSec.t === ti && dragSec.s === si" @dragstart.stop="$event.dataTransfer.setData('text/plain', 'section')" @dragend="dragSec=null" @dragover.prevent @drop.prevent.stop="dragSec ? dropSection(ti, si) : dropTop(null, tab.handle, sec.handle)">
+                  <template x-if="isEditingSection(ti, si)">
+                    <div>
+                      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                        <input x-model="sec.display" placeholder="Label" class="{{template "fe-cls"}} !h-8 w-full flex-1 sm:w-auto">
+                        <input x-model="sec.handle" placeholder="handle" class="{{template "fe-cls"}} !h-8 w-full flex-1 sm:w-auto">
+                        <button type="button" class="inline-flex size-8 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-800/5 dark:text-zinc-300 dark:hover:bg-white/10" title="Regenerate from label" @click="sec.handle = slug(sec.display)">{{template "icon-refresh"}}</button>
+                        {{template "button" (dict "Label" "Cancel" "Size" "sm" "Attrs" (safe `@click="cancelSection(ti, si)"`))}}
+                        {{template "button" (dict "Label" "Done" "Size" "sm" "Variant" "primary" "Attrs" (safe `@click="confirmSection()"`))}}
+                      </div>
+                      {{template "fe-err" "'tabs.'+ti+'.sections.'+si+'.handle'"}}
+                    </div>
+                  </template>
+                  <template x-if="!isEditingSection(ti, si)">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <div class="flex min-w-0 flex-wrap items-center gap-1">
+                        <span @mousedown="dragSec={t: ti, s: si}" @mouseup="dragSec=null" class="flex h-full cursor-grab items-center px-1 text-zinc-400 hover:text-zinc-600 active:cursor-grabbing dark:hover:text-zinc-300" title="Drag to reorder">{{template "icon-grip"}}</span>
+                        <span class="rounded-2xl bg-emerald-300 px-2 py-0.5 text-[10px] text-zinc-900">Section</span>
+                        <span class="text-xs font-medium text-zinc-500" x-text="sec.display || sec.handle"></span>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <div x-data="{open:false, pos:{}}" class="inline-block">{{template "ellipsis-trigger"}}{{template "menu-open"}}
+                          {{template "menu-item" (dict "Label" "Edit" "Icon" "pencil" "Attrs" (safe `@click="open=false; editingSection=[ti, si]"`))}}
+                          {{template "menu-danger" (dict "Label" "Delete" "Icon" "trash" "Attrs" (safe `@click="open=false; deleteSection=[ti, si]; $refs.confirmSection.showModal()"`))}}
+                        {{template "menu-close"}}</div>
+                        {{template "button" (dict "Label" "Add field" "Size" "sm" "Variant" "primary" "Attrs" (safe `@click="addField(tab.handle, sec.handle)"`))}}
+                      </div>
+                    </div>
+                  </template>
+
+                  <div class="space-y-3">
+                    <template x-for="f0 in groupFields(tab.handle, sec.handle)" :key="f0._uid">
+                      {{template "field-editor" (dict "Depth" 0 "F" "f0" "S" "fields" "P" "('fields.'+fields.indexOf(f0))" "Top" true "TabX" "tab.handle" "SecX" "sec.handle")}}
+                    </template>
+                  </div>
+                  <p x-show="!groupFields(tab.handle, sec.handle).length" class="text-sm text-zinc-500">No fields in this section yet.</p>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="flags[namespace] && flags[namespace].schema">
+        <div class="space-y-3 rounded-xl border border-gray-200 bg-gray-200 p-2 dark:border-gray-700 dark:bg-zinc-950"><div class="rounded-xl bg-white p-3 dark:bg-zinc-800">
+          <div class="flex flex-wrap items-center gap-1"><span class="rounded-2xl bg-indigo-300 px-2 py-0.5 text-[10px] text-zinc-900">Code-managed</span><span class="text-sm font-medium">Schema</span></div>
+          <p class="text-sm text-zinc-500">Entries in this collection get a "Schema" tab for attaching schema.org JSON-LD blocks. Its fields are fixed in code, not editable here — see EntryForm.</p>
+        </div></div>
+      </template>
+      <template x-if="flags[namespace] && flags[namespace].seo">
+        <div class="space-y-3 rounded-xl border border-gray-200 bg-gray-200 p-2 dark:border-gray-700 dark:bg-zinc-950"><div class="rounded-xl bg-white p-3 dark:bg-zinc-800">
+          <div class="flex flex-wrap items-center gap-1"><span class="rounded-2xl bg-indigo-300 px-2 py-0.5 text-[10px] text-zinc-900">Code-managed</span><span class="text-sm font-medium">SEO</span></div>
+          <p class="text-sm text-zinc-500">Entries in this collection get an "SEO" tab for meta title/description, robots, sitemap hints, etc. Its fields are fixed in code, not editable here — see EntryForm.</p>
+        </div></div>
+      </template>
+    </div>
+
+    <div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Href" (print .CP "/blueprints"))}}{{template "button" (dict "Label" "Save" "Variant" "primary" "Type" "submit")}}</div>
+  </form>
+
+  {{template "fe-confirm" (dict "Ref" "confirmField" "Title" "Delete this field?" "Text" "This cannot be undone." "Attrs" (safe `@click="removeField(); $el.closest('dialog').close()"`))}}
+  {{template "fe-confirm" (dict "Ref" "confirmTab" "Title" "Delete this tab?" "Text" "Its fields will move back to Main. This cannot be undone." "Attrs" (safe `@click="removeTab(deleteTab); deleteTab=null; $el.closest('dialog').close()"`))}}
+  {{template "fe-confirm" (dict "Ref" "confirmSection" "Title" "Delete this section?" "Text" "Its fields will be ungrouped. This cannot be undone." "Attrs" (safe `@click="removeSection(deleteSection[0], deleteSection[1]); deleteSection=null; $el.closest('dialog').close()"`))}}
+</section>
+{{end}}

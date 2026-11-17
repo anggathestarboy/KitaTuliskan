@@ -17,8 +17,8 @@
       <td class="{{template "td-class"}}">{{index . "hits"}}</td>
       <td class="{{template "td-class"}} text-right"><div x-data="{open:false, pos:{}}" class="inline-block">{{template "ellipsis-trigger"}}
         {{template "menu-open"}}
-          {{template "menu-item" (dict "Label" "Edit" "Attrs" (safe (print `@click="open=false; $dispatch('edit', ` (json .) `)"`)))}}
-          {{template "menu-danger" (dict "Label" "Delete" "Attrs" (safe (print `@click="open=false; $dispatch('remove', {id:` (index . "id") `, label:` (json (index . "source")) `})"`)))}}
+          {{template "menu-item" (dict "Label" "Edit" "Attrs" (safe (print `@click="open=false; $dispatch('edit', ` (jsonattr .) `)"`)))}}
+          {{template "menu-danger" (dict "Label" "Delete" "Attrs" (safe (print `@click="open=false; $dispatch('remove', {id:` (index . "id") `, label:` (jsonattr (index . "source")) `})"`)))}}
         {{template "menu-close"}}</div></td>
     </tr>
     {{else}}<tr><td colspan="7" class="px-3 py-10 text-center text-sm text-zinc-500">No redirects yet.</td></tr>{{end}}</tbody>

@@ -19,8 +19,8 @@
         <form method="post" action="{{$base}}/{{index $row "id"}}/move/down" class="inline"><button type="submit" {{if eq (inc $i) $n}}disabled{{end}} class="inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/5 disabled:opacity-30 disabled:hover:bg-transparent dark:text-zinc-300 dark:hover:bg-white/10" aria-label="Move down">{{template "icon-chevron-down"}}</button></form>
         <div x-data="{open:false, pos:{}}" class="inline-block">{{template "ellipsis-trigger"}}
         {{template "menu-open"}}
-          {{template "menu-item" (dict "Label" "Settings" "Icon" "cog" "Attrs" (safe (print `@click="open=false; $dispatch('edit', ` (json $row) `)"`)))}}
-          {{if not $isOrigin}}{{template "menu-danger" (dict "Label" "Delete" "Icon" "trash" "Attrs" (safe (print `@click="open=false; $dispatch('remove', {id:` (index $row "id") `, label:` (json (index $row "name")) `})"`)))}}{{end}}
+          {{template "menu-item" (dict "Label" "Settings" "Icon" "cog" "Attrs" (safe (print `@click="open=false; $dispatch('edit', ` (jsonattr $row) `)"`)))}}
+          {{if not $isOrigin}}{{template "menu-danger" (dict "Label" "Delete" "Icon" "trash" "Attrs" (safe (print `@click="open=false; $dispatch('remove', {id:` (index $row "id") `, label:` (jsonattr (index $row "name")) `})"`)))}}{{end}}
         {{template "menu-close"}}</div>{{end}}</td>
     </tr>
     {{else}}<tr><td colspan="6" class="px-3 py-10 text-center text-sm text-zinc-500">No sites yet.</td></tr>{{end}}</tbody>

@@ -1,0 +1,26 @@
+{{template "app" .}}
+{{define "title"}}Blueprints{{end}}
+{{define "content"}}
+<section class="w-full space-y-6" x-data="{deleteId:null}">
+  {{template "page-header" (dict "Title" "Blueprints" "Action" (safe (print `<a href="` .CP `/fieldsets" class="inline-flex h-8 items-center rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium shadow-xs hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-700 dark:hover:bg-zinc-600">Fieldsets</a><a href="` .CP `/blueprints/create" class="inline-flex h-8 items-center rounded-lg border border-transparent bg-zinc-800 px-3 text-sm font-medium text-white shadow-xs hover:bg-zinc-700 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-200">New blueprint</a>`)))}}
+
+  {{if .Empty}}<p class="text-sm text-zinc-500">No blueprints yet.</p>{{end}}
+  {{$cp := .CP}}{{$groups := .Groups}}
+  {{range $cat := list "collections|Collections" "globals|Globals" "taxonomies|Taxonomies" "navigations|Navigation" "forms|Forms" "other|Other"}}{{$key := index (split $cat "|") 0}}{{with index $groups $key}}
+  <div class="rounded-2xl bg-zinc-100 px-2 py-2 dark:bg-zinc-950">
+    <h2 class="px-2 pb-2 pt-1 text-base font-semibold">{{index (split $cat "|") 1}}</h2>
+    <div class="rounded-xl bg-white px-3 py-1 dark:bg-zinc-800">
+      <table class="w-full">
+        <thead><tr>{{template "th" "Namespace"}}<th class="w-[400px] px-3 py-3 text-left text-sm font-medium text-zinc-800 dark:text-white">Handle</th><th class="w-[100px] px-3 py-3 text-left text-sm font-medium text-zinc-800 dark:text-white">Fields</th><th class="w-[150px]"></th></tr></thead>
+        <tbody>{{range .}}<tr class="{{template "tr-class"}}">
+          <td class="{{template "td-class"}}">{{or (index . "namespace") "—"}}</td><td class="{{template "td-class"}}">{{index . "handle"}}</td><td class="{{template "td-class"}}">{{index . "fields"}}</td>
+          <td class="{{template "td-class"}}"><div class="flex justify-end gap-2">{{template "button" (dict "Label" "Edit" "Size" "sm" "Href" (print $cp "/blueprints/" (index . "id") "/edit"))}}{{template "button" (dict "Label" "Delete" "Size" "sm" "Variant" "danger" "Attrs" (safe (print `@click="deleteId=` (index . "id") `; $refs.confirm.showModal()"`)))}}</div></td>
+        </tr>{{end}}</tbody>
+      </table>
+    </div>
+  </div>{{end}}{{end}}
+
+  {{template "fe-confirm" (dict "Ref" "confirm" "Title" "Delete this blueprint?" "Text" "This cannot be undone." "Attrs" (safe (print `@click="$refs.del.action='` .CP `/blueprints/'+deleteId+'/delete'; $refs.del.submit()"`)))}}
+  <form x-ref="del" method="post" class="hidden"></form>
+</section>
+{{end}}

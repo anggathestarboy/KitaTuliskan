@@ -296,8 +296,10 @@ var funcs = template.FuncMap{
 		}
 		return template.HTMLAttr(fmt.Sprint(v))
 	},
-	// json: nilai → JSON yang sudah di-HTML-escape, aman ditaruh di dalam atribut "..." yang dibungkus safe.
-	"json": func(v any) string { b, _ := json.Marshal(v); return template.HTMLEscapeString(string(b)) },
+	// json: nilai → JSON mentah; pakai langsung di atribut ({{json .X}}), html/template yang meng-escape.
+	"json": func(v any) string { b, _ := json.Marshal(v); return string(b) },
+	// jsonattr: JSON yang sudah di-HTML-escape, untuk disisipkan ke string yang dibungkus safe (print `@click="f(` (jsonattr .) `)"`).
+	"jsonattr": func(v any) string { b, _ := json.Marshal(v); return template.HTMLEscapeString(string(b)) },
 	"cond": func(c, a, b any) any {
 		if ok, _ := texttemplate.IsTrue(c); ok {
 			return a

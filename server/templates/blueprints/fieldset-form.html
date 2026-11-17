@@ -1,0 +1,32 @@
+{{template "app" .}}
+{{define "title"}}{{if .State.ID}}Edit fieldset{{else}}New fieldset{{end}}{{end}}
+{{define "content"}}
+{{template "field-builder-js"}}
+<section class="w-full max-w-6xl space-y-6" x-data="fieldBuilder({{json .State}}, {{json .Lookups}}, {{json .Editor}}, {})"
+  @keydown.window.ctrl.s.prevent="$refs.form.requestSubmit()" @keydown.window.meta.s.prevent="$refs.form.requestSubmit()">
+  <div>
+    <a href="{{.CP}}/fieldsets" class="text-sm text-zinc-500 hover:text-zinc-800 dark:hover:text-white">← Fieldsets</a>
+    <h1 class="mt-5 text-lg font-semibold">{{if .State.ID}}Edit fieldset{{else}}New fieldset{{end}}</h1>
+  </div>
+
+  <form x-ref="form" method="post" action="{{.CP}}/fieldsets/save" class="space-y-6">
+    <input type="hidden" name="state" :value="payload()">
+    <div>{{template "fe-label" "Handle"}}<input x-model="handle" required class="{{template "fe-cls"}}"><p class="mt-1 text-xs text-zinc-500">Lowercase letters, numbers and underscores only — no spaces.</p>{{template "fe-err" "'handle'"}}</div>
+
+    <div class="space-y-3">
+      {{template "fe-toolbar" (dict "AddLabel" "Add field" "AddAttrs" (safe `@click="addField('main', '')"`))}}
+      {{template "fe-err" "'fields'"}}
+      <div class="space-y-3" @dragover.prevent @drop.prevent="dropTop(null, 'main', '')">
+        <template x-for="f0 in fields" :key="f0._uid">
+          {{template "field-editor" (dict "Depth" 0 "F" "f0" "S" "fields" "P" "('fields.'+fields.indexOf(f0))" "Top" true "TabX" "'main'" "SecX" "''")}}
+        </template>
+      </div>
+      <p x-show="!fields.length" class="text-sm text-zinc-500">No fields yet.</p>
+    </div>
+
+    <div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Href" (print .CP "/fieldsets"))}}{{template "button" (dict "Label" "Save" "Variant" "primary" "Type" "submit")}}</div>
+  </form>
+
+  {{template "fe-confirm" (dict "Ref" "confirmField" "Title" "Delete this field?" "Text" "This cannot be undone." "Attrs" (safe `@click="removeField(); $el.closest('dialog').close()"`))}}
+</section>
+{{end}}
