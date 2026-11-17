@@ -1,7 +1,7 @@
 // Padanan partials/_grid-item, _list-item, _thumbnail di source + context menu.
 import { type DragEvent, type MouseEvent, useEffect, useState } from 'react';
 import { type Asset, type Can, ago, fileSize } from './api';
-import { FolderIcon, Icon, PdfIcon, cn } from './ui';
+import { FolderIcon, Icon, PdfIcon, cn } from '../shared/ui';
 
 export interface Ctx {
   can: Can;
@@ -105,15 +105,4 @@ export function Entry({ row, mode, ctx }: { row: Row; mode: 'grid' | 'list'; ctx
   );
 }
 
-export interface MenuAction { label: string; danger?: boolean; run: () => void }
-
-export function ContextMenu({ x, y, actions, close }: { x: number; y: number; actions: MenuAction[]; close: () => void }) {
-  useEffect(() => { addEventListener('click', close); return () => removeEventListener('click', close); }, [close]);
-  return (
-    <div onClick={(e) => e.stopPropagation()} style={{ left: x, top: y }} className="fixed z-50 w-40 rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-      {actions.map((a) => (
-        <button key={a.label} type="button" onClick={() => { close(); a.run(); }} className={cn('block w-full cursor-pointer px-3 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800', a.danger && 'text-red-600')}>{a.label}</button>
-      ))}
-    </div>
-  );
-}
+export { ContextMenu, type MenuAction } from '../shared/flux';

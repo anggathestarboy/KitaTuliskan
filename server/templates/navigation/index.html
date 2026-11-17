@@ -1,9 +1,4 @@
 {{template "app" .}}
 {{define "title"}}Navigation{{end}}
-{{define "content"}}
-<section class="w-full space-y-6">
-{{template "page-header" (dict "Title" "Navigation" "Action" (safe ``))}}
-{{template "callout" (dict "Text" "Tree editor not yet implemented in lite. Items are stored in the trees table via the Structure package.")}}
-{{template "card-open"}}<pre class="p-4 text-xs">{{.Tree}}</pre>{{template "card-close"}}
-</section>
-{{end}}
+{{define "content"}}<navigation-manager data-cp="{{.CP}}"></navigation-manager>
+{{vite "resources/ts/navigation/main.tsx"}}{{end}}

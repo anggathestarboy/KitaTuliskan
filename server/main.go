@@ -61,6 +61,15 @@ func main() {
 			if err := media.Make(app, strings.TrimSpace(fs.Arg(0)), *kind); err != nil {
 				log.Fatal(err)
 			}
+		case "sidebar": // = php artisan admin:sidebar {--force}
+			fs := flag.NewFlagSet("sidebar", flag.ExitOnError)
+			force := fs.Bool("force", false, "reset tree sidebar ke default bila sudah ada")
+			fs.Parse(os.Args[2:])
+			if navigation.SeedAdminSidebar(app, *force) {
+				log.Println("Admin sidebar navigation seeded.")
+			} else {
+				log.Println("The admin sidebar navigation already exists. Pass -force to reset it back to these defaults.")
+			}
 		case "media:remove":
 			if len(os.Args) < 3 {
 				log.Fatal("usage: media:remove {handle}")

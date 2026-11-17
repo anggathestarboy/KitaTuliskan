@@ -42,6 +42,6 @@ func setup(a *web.App, args []string) {
 		a.DB.Exec(`INSERT INTO entries(id,site,published,status,slug,uri,collection,blueprint,data,created_at,updated_at) VALUES(?,?,1,'published','home','/','pages','homepage',?,?,?)`,
 			web.UUID(), *siteHandle, `{"title":"Welcome to Draft CMS","content":"If your dreams don't scare you, they are not big enough."}`, now, now)
 	}
-	navigation.SeedAdminSidebar(a)
+	navigation.SeedAdminSidebar(a, false)
 	fmt.Println("✓ setup selesai. Login di", a.CP("/login"))
 }

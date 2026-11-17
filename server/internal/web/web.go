@@ -115,6 +115,8 @@ func (a *App) Render(w http.ResponseWriter, r *http.Request, name string, data m
 
 type SidebarItem struct {
 	Title, URL, Target string
+	Type               string
+	PageID             string `json:"page_id"`
 	Children           []SidebarItem
 	Roles              []string
 }
@@ -126,6 +128,7 @@ func (a *App) sidebar(u *User) []SidebarItem {
 	a.DB.QueryRow(`SELECT tree FROM trees WHERE handle='sidebar-admin' AND type='navigation' LIMIT 1`).Scan(&raw)
 	var items []SidebarItem
 	json.Unmarshal([]byte(raw.String), &items)
+	a.resolvePages(items)
 	if u.IsSuper() {
 		return items
 	}
@@ -330,5 +333,21 @@ func (a *App) ConfirmPassword(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		next(w, r)
+	}
+}
+
+// resolvePages = NavigationTreeService::resolveUrl: item bertipe "page" diarahkan ke slug entry-nya saat render,
+// sehingga perubahan slug otomatis ikut tanpa menyentuh tree yang tersimpan.
+func (a *App) resolvePages(items []SidebarItem) {
+	for i := range items {
+		if it := &items[i]; it.Type == "page" {
+			var slug sql.NullString
+			a.DB.QueryRow(`SELECT slug FROM entries WHERE id=?`, it.PageID).Scan(&slug)
+			it.URL = ""
+			if slug.Valid && slug.String != "" {
+				it.URL = "/" + strings.TrimLeft(slug.String, "/")
+			}
+		}
+		a.resolvePages(items[i].Children)
 	}
 }

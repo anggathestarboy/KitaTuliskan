@@ -60,7 +60,7 @@ export function Input({ label, description, onEnter, icon, small, className, ...
   return (
     <div className="block min-w-0">
       {label && <label className={cn('inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white', description ? 'mb-2' : 'mb-3')}>{label}</label>}
-      {description && <p className="mb-3 text-sm text-zinc-500 dark:text-white/70">{description}</p>}
+      {description && <p className="mb-3 text-sm text-zinc-500 dark:text-white/60">{description}</p>}
       <div className={cn('group/input relative block w-full', className)}>
         {icon && <div className="pointer-events-none absolute start-0 top-0 bottom-0 flex items-center justify-center border-s border-transparent ps-3 text-xs text-zinc-400/75 dark:text-white/60"><MiniIcon name={icon} /></div>}
         <input {...p} onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}

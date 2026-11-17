@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { type Compression, type Progress, formatBytes, sliderQuality, sliderTarget } from './api';
 import { UploadProgress } from './Progress';
-import { Button, Heading, Modal, ModalActions, Text } from './ui';
+import { Button, Heading, Modal, ModalActions, Text } from '../shared/ui';
 
 export function Compress({ files, cfg, busy, progress, onCancel, onConfirm }: { files: File[]; cfg: Compression; busy: boolean; progress: Progress | null; onCancel: () => void; onConfirm: (level: number) => void }) {
   const [level, setLevel] = useState(50);
