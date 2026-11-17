@@ -12,7 +12,7 @@ import (
 
 // Permissions statis = PermissionRegistry::controlPanelGroup + usersGroup. Group per-collection/site menyusul.
 var Permissions = []string{"super", "access cp", "configure sites", "configure fields", "configure form fields", "manage preferences",
-	"view users", "edit users", "create users", "delete users", "ban users", "change passwords", "edit user groups", "edit roles"}
+	"configure redirects", "view users", "edit users", "create users", "delete users", "ban users", "change passwords", "edit user groups", "edit roles"}
 
 func Register(mux *http.ServeMux, a *web.App) {
 	a.Resource(mux, web.Resource{Path: "/users", Table: "users", Title: "Users", One: "User", Perm: "delete users", NoCreate: true,

@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -287,6 +288,15 @@ var funcs = template.FuncMap{
 	"vite":      viteTags,
 	"split":     strings.Split,
 	"safe":      func(s string) template.HTML { return template.HTML(s) },
+	// attrs: html/template menolak template.HTML di posisi nama atribut (jadi "ZgotmplZ"); harus HTMLAttr.
+	"attrs": func(v any) template.HTMLAttr {
+		if v == nil {
+			return ""
+		}
+		return template.HTMLAttr(fmt.Sprint(v))
+	},
+	// json: nilai → JSON yang sudah di-HTML-escape, aman ditaruh di dalam atribut "..." yang dibungkus safe.
+	"json": func(v any) string { b, _ := json.Marshal(v); return template.HTMLEscapeString(string(b)) },
 	"cond": func(c, a, b any) any {
 		if ok, _ := texttemplate.IsTrue(c); ok {
 			return a

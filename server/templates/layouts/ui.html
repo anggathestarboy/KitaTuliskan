@@ -7,26 +7,26 @@
 {{else if eq $v "ghost"}}{{$cls = print $cls " border-transparent shadow-none text-zinc-800 hover:bg-zinc-800/5 dark:text-white dark:hover:bg-white/10"}}
 {{else}}{{$cls = print $cls " border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-700 dark:text-white dark:hover:bg-zinc-600"}}{{end}}
 {{if eq .Size "sm"}}{{$cls = print $cls " h-8 px-3 text-sm"}}{{else}}{{$cls = print $cls " h-10 px-4"}}{{end}}
-{{if .Href}}<a href="{{.Href}}" class="{{$cls}}" {{.Attrs}}>{{.Label}}</a>{{else}}<button type="{{or .Type "button"}}" class="{{$cls}}" {{.Attrs}}>{{.Label}}</button>{{end}}{{end}}
+{{if .Href}}<a href="{{.Href}}" class="{{$cls}}" {{attrs .Attrs}}>{{.Label}}</a>{{else}}<button type="{{or .Type "button"}}" class="{{$cls}}" {{attrs .Attrs}}>{{.Label}}</button>{{end}}{{end}}
 
-{{/* input: dict Label Name Type Value Placeholder Required Autocomplete Description Error */}}
+{{/* input: dict Label Name Type Value Placeholder Required Autocomplete Description Error Attrs */}}
 {{define "input"}}<div class="space-y-2 text-sm">{{with .Label}}<label class="block font-medium text-zinc-800 dark:text-white">{{.}}</label>{{end}}
-{{if eq .Type "textarea"}}<textarea name="{{.Name}}" rows="{{or .Rows 4}}" placeholder="{{.Placeholder}}" {{if .Required}}required{{end}} class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-base text-zinc-700 shadow-xs placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-800/10 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300 sm:text-sm">{{.Value}}</textarea>
-{{else}}<input name="{{.Name}}" type="{{or .Type "text"}}" value="{{.Value}}" placeholder="{{.Placeholder}}" {{if .Required}}required{{end}} {{with .Autocomplete}}autocomplete="{{.}}"{{end}} {{with .Min}}min="{{.}}"{{end}} class="block h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base text-zinc-700 shadow-xs placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-800/10 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300 sm:text-sm">{{end}}
+{{if eq .Type "textarea"}}<textarea name="{{.Name}}" rows="{{or .Rows 4}}" placeholder="{{.Placeholder}}" {{if .Required}}required{{end}} {{attrs .Attrs}} class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-base text-zinc-700 shadow-xs placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-800/10 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300 sm:text-sm">{{.Value}}</textarea>
+{{else}}<input name="{{.Name}}" type="{{or .Type "text"}}" value="{{.Value}}" placeholder="{{.Placeholder}}" {{if .Required}}required{{end}} {{with .Autocomplete}}autocomplete="{{.}}"{{end}} {{with .Min}}min="{{.}}"{{end}} {{attrs .Attrs}} class="block h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base text-zinc-700 shadow-xs placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-800/10 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300 sm:text-sm">{{end}}
 {{with .Description}}<p class="text-xs text-zinc-500 dark:text-zinc-400">{{.}}</p>{{end}}{{with .Error}}<p class="text-xs text-red-500">{{.}}</p>{{end}}</div>{{end}}
 
-{{/* select: dict Label Name Value Options(list of "value|label") */}}
+{{/* select: dict Label Name Value Options(list of "value|label") Attrs */}}
 {{define "select"}}<div class="space-y-2 text-sm">{{with .Label}}<label class="block font-medium text-zinc-800 dark:text-white">{{.}}</label>{{end}}
-<select name="{{.Name}}" class="block h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 shadow-xs focus:outline-none focus:ring-2 focus:ring-zinc-800/10 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+<select name="{{.Name}}" {{attrs .Attrs}} class="block h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 shadow-xs focus:outline-none focus:ring-2 focus:ring-zinc-800/10 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
 {{$cur := .Value}}{{range .Options}}{{$v := index (split . "|") 0}}<option value="{{$v}}" {{if eq $v $cur}}selected{{end}}>{{index (split . "|") 1}}</option>{{end}}</select></div>{{end}}
 
 {{/* checkbox: dict Label Name Checked Description */}}
 {{define "checkbox"}}<label class="flex items-start gap-3 text-sm"><input type="checkbox" name="{{.Name}}" value="1" {{if .Checked}}checked{{end}} class="mt-0.5 size-4 rounded border-zinc-300 text-zinc-800 focus:ring-zinc-800/20 dark:border-zinc-600 dark:bg-zinc-700">
 <span><span class="font-medium text-zinc-800 dark:text-white">{{.Label}}</span>{{with .Description}}<span class="block text-xs text-zinc-500 dark:text-zinc-400">{{.}}</span>{{end}}</span></label>{{end}}
 
-{{/* switch: dict Label Name Checked */}}
-{{define "switch"}}<label class="flex items-center justify-between gap-4 text-sm" x-data="{on: {{if .Checked}}true{{else}}false{{end}}}"><span class="font-medium text-zinc-800 dark:text-white">{{.Label}}</span>
-<input type="hidden" name="{{.Name}}" :value="on ? 1 : 0"><button type="button" role="switch" :aria-checked="on" @click="on = !on" class="relative h-5 w-9 rounded-full transition" :class="on ? 'bg-zinc-800 dark:bg-white' : 'bg-zinc-300 dark:bg-zinc-600'"><span class="absolute top-0.5 size-4 rounded-full bg-white shadow transition dark:bg-zinc-800" :class="on ? 'left-4.5' : 'left-0.5'"></span></button></label>{{end}}
+{{/* switch: dict Label Name Checked Model. Model = ekspresi Alpine milik x-data induk (mis. "f.is_active"); tanpa Model pakai state lokal "on". */}}
+{{define "switch"}}{{$on := or .Model "on"}}<label class="flex items-center justify-between gap-4 text-sm" {{if not .Model}}x-data="{on: {{if .Checked}}true{{else}}false{{end}}}"{{end}}><span class="font-medium text-zinc-800 dark:text-white">{{.Label}}</span>
+<input type="hidden" name="{{.Name}}" :value="{{$on}} ? 1 : 0"><button type="button" role="switch" :aria-checked="{{$on}}" @click="{{$on}} = !{{$on}}" class="relative h-5 w-9 rounded-full transition" :class="{{$on}} ? 'bg-zinc-800 dark:bg-white' : 'bg-zinc-300 dark:bg-zinc-600'"><span class="absolute top-0.5 size-4 rounded-full bg-white shadow transition dark:bg-zinc-800" :class="{{$on}} ? 'left-4.5' : 'left-0.5'"></span></button></label>{{end}}
 
 {{/* badge: dict Label Color(zinc|green|amber|red|blue) */}}
 {{define "badge"}}{{$c := or .Color "zinc"}}<span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium
@@ -53,8 +53,9 @@
 {{/* menu dirender fixed (bukan absolute) supaya tidak terpotong overflow-x-auto pada card tabel; posisi dihitung dari tombol saat dibuka */}}
 {{define "menu-open"}}<div x-show="open" x-cloak @click.outside="open=false" @scroll.window="open=false" @resize.window="open=false" x-transition.origin.top.right :style="pos" class="fixed z-40 min-w-40 rounded-lg border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-600 dark:bg-zinc-700">{{end}}
 {{define "menu-close"}}</div>{{end}}
-{{define "menu-item"}}<a href="{{.Href}}" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-zinc-800 hover:bg-zinc-100 dark:text-white dark:hover:bg-zinc-600">{{.Label}}</a>{{end}}
-{{define "menu-danger"}}<button type="button" {{.Attrs}} class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-red-600 hover:bg-zinc-100 dark:text-red-400 dark:hover:bg-zinc-600">{{.Label}}</button>{{end}}
+{{/* menu-item: Href → link; tanpa Href → button dengan Attrs */}}
+{{define "menu-item"}}{{$cls := "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-zinc-800 hover:bg-zinc-100 dark:text-white dark:hover:bg-zinc-600"}}{{if .Href}}<a href="{{.Href}}" class="{{$cls}}">{{.Label}}</a>{{else}}<button type="button" {{attrs .Attrs}} class="{{$cls}}">{{.Label}}</button>{{end}}{{end}}
+{{define "menu-danger"}}<button type="button" {{attrs .Attrs}} class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-red-600 hover:bg-zinc-100 dark:text-red-400 dark:hover:bg-zinc-600">{{.Label}}</button>{{end}}
 {{define "ellipsis-trigger"}}<button type="button" @click="open=!open; const r=$el.getBoundingClientRect(); pos={top: r.bottom+4+'px', left: Math.max(8, r.right-160)+'px'}" class="inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/5 dark:text-zinc-300 dark:hover:bg-white/10" aria-label="Actions">{{template "icon-ellipsis"}}</button>{{end}}
 
 {{/* modal: <dialog> native. Buka: $refs.NAME.showModal() atau document.getElementById(id).showModal() */}}

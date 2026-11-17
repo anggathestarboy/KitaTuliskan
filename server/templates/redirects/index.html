@@ -1,0 +1,59 @@
+{{template "app" .}}
+{{define "title"}}Redirect Manager{{end}}
+{{define "content"}}
+{{/* f = state form; open(row) isi dari baris (edit) atau default (new). Tanggal DB "Y-m-d H:i:s" → datetime-local "Y-m-dTH:i". */}}
+<section class="w-full space-y-6" x-data="{deleteId:null, deleteLabel:'', f:{},
+  open(r){ const dt=v=>v?String(v).replace(' ','T').slice(0,16):''; this.f = r ? {...r, start_at:dt(r.start_at), end_at:dt(r.end_at), is_active:!!r.is_active, is_external:!!r.is_external, keep_path:!!r.keep_path}
+    : {id:'', source:'', target:'', status_code:'301', match_type:'exact', start_at:'', end_at:'', is_active:true, is_external:false, keep_path:true, hits:0}; this.$refs.form.showModal() }}">
+  {{template "page-header" (dict "Title" "Redirect Manager" "Action" (safe `<button type="button" @click="open()" class="inline-flex h-8 items-center gap-2 rounded-lg border border-transparent bg-zinc-800 px-3 text-sm font-medium text-white shadow-xs hover:bg-zinc-700 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-200">New redirect</button>`))}}
+
+  {{template "card-open"}}
+  <table class="w-full">
+    <thead class="bg-zinc-100 dark:bg-zinc-900"><tr>{{template "th" "Source"}}{{template "th" "Target"}}{{template "th" "Status"}}{{template "th" "Match type"}}{{template "th" "Active"}}{{template "th" "Hits"}}<th class="last:rounded-tr-xl"></th></tr></thead>
+    <tbody>{{$base := .Base}}{{range .Rows}}
+    <tr class="{{template "tr-class"}}">
+      <td class="{{template "td-class"}}">{{index . "source"}}</td><td class="{{template "td-class"}}">{{index . "target"}}</td><td class="{{template "td-class"}}">{{index . "status_code"}}</td><td class="{{template "td-class"}}">{{index . "match_type"}}</td>
+      <td class="{{template "td-class"}}">{{if eq (print (index . "is_active")) "1"}}{{template "badge" (dict "Label" "Active" "Color" "green")}}{{else}}{{template "badge" (dict "Label" "Inactive")}}{{end}}</td>
+      <td class="{{template "td-class"}}">{{index . "hits"}}</td>
+      <td class="{{template "td-class"}} text-right"><div x-data="{open:false, pos:{}}" class="inline-block">{{template "ellipsis-trigger"}}
+        {{template "menu-open"}}
+          {{template "menu-item" (dict "Label" "Edit" "Attrs" (safe (print `@click="open=false; $dispatch('edit', ` (json .) `)"`)))}}
+          {{template "menu-danger" (dict "Label" "Delete" "Attrs" (safe (print `@click="open=false; $dispatch('remove', {id:` (index . "id") `, label:` (json (index . "source")) `})"`)))}}
+        {{template "menu-close"}}</div></td>
+    </tr>
+    {{else}}<tr><td colspan="7" class="px-3 py-10 text-center text-sm text-zinc-500">No redirects yet.</td></tr>{{end}}</tbody>
+  </table>
+  {{template "card-close"}}
+
+  <dialog x-ref="form" @edit.window="open($event.detail)" class="m-auto w-full max-w-lg rounded-xl border border-zinc-200 bg-white p-4 text-zinc-800 shadow-xl backdrop:bg-zinc-900/40 backdrop:backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" @click.self="$el.close()">{{template "modal-x"}}
+  <form method="post" action="{{.Base}}" class="space-y-6" @keydown.window.meta.s.prevent="$el.closest('dialog').open && $el.requestSubmit()" @keydown.window.ctrl.s.prevent="$el.closest('dialog').open && $el.requestSubmit()">
+    <h2 class="text-lg font-semibold" x-text="f.id ? 'Redirect details' : 'New redirect'"></h2>
+    <input type="hidden" name="id" :value="f.id">
+    <div class="space-y-4">
+      {{template "input" (dict "Label" "Source" "Name" "source" "Placeholder" "/old-path" "Required" true "Attrs" (safe `x-model="f.source"`))}}
+      {{template "input" (dict "Label" "Target" "Name" "target" "Placeholder" "/new-path" "Required" true "Attrs" (safe `x-model="f.target"`))}}
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{template "select" (dict "Label" "Status code" "Name" "status_code" "Attrs" (safe `x-model="f.status_code"`) "Options" (list "301|301 — Permanent" "302|302 — Temporary" "307|307 — Temporary (keep method)" "308|308 — Permanent (keep method)" "410|410 — Gone" "451|451 — Unavailable for legal reasons"))}}
+        {{template "select" (dict "Label" "Match type" "Name" "match_type" "Attrs" (safe `x-model="f.match_type"`) "Options" (list "exact|Exact" "prefix|Prefix" "regex|Regex"))}}
+      </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {{template "input" (dict "Label" "Start at" "Name" "start_at" "Type" "datetime-local" "Attrs" (safe `x-model="f.start_at"`))}}
+        {{template "input" (dict "Label" "End at" "Name" "end_at" "Type" "datetime-local" "Attrs" (safe `x-model="f.end_at"`))}}
+      </div>
+      {{template "switch" (dict "Label" "Active" "Name" "is_active" "Model" "f.is_active")}}
+      {{template "switch" (dict "Label" "External target" "Name" "is_external" "Model" "f.is_external")}}
+      <div x-show="f.match_type !== 'exact'">{{template "switch" (dict "Label" "Keep path" "Name" "keep_path" "Model" "f.keep_path")}}</div>
+      <p class="text-sm text-zinc-500" x-text="(f.hits || 0) + ' hits so far.'"></p>
+    </div>
+    <div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Attrs" (safe `onclick="this.closest('dialog').close()"`))}}{{template "button" (dict "Label" "Save" "Variant" "primary" "Type" "submit")}}</div>
+  </form>
+  </dialog>
+
+  <dialog x-ref="confirm" @remove.window="deleteId=$event.detail.id; deleteLabel=$event.detail.label; $el.showModal()" class="m-auto w-full max-w-md rounded-xl border border-zinc-200 bg-white p-4 text-zinc-800 shadow-xl backdrop:bg-zinc-900/40 backdrop:backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" @click.self="$el.close()">
+    <form method="post" :action="'{{.Base}}/' + deleteId + '/delete'" class="space-y-6">
+      <div><h2 class="text-lg font-semibold">Delete <span x-text="deleteLabel"></span>?</h2>{{template "subheading" "This action cannot be undone."}}</div>
+      <div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Attrs" (safe `onclick="this.closest('dialog').close()"`))}}{{template "button" (dict "Label" "Delete" "Variant" "danger" "Type" "submit")}}</div>
+    </form>
+  </dialog>
+</section>
+{{end}}
