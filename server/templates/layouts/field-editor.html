@@ -1,0 +1,280 @@
+{{/* Field builder = source partials/field-editor.blade.php + HasFieldBuilder, dijalankan di Alpine.
+     Dipakai blueprints/form.html dan blueprints/fieldset-form.html. State (tabs, fields) dikirim utuh sebagai JSON di input hidden "state".
+     Rekursi replicator: Go template memanggil dirinya sampai Depth 5 (ponytail: replicator bersarang > 5 tingkat tidak dirender; naikkan angka di bawah kalau perlu). */}}
+
+{{define "fe-cls"}}block h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 shadow-xs placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-800/10 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300{{end}}
+{{define "fe-label"}}<label class="mb-1 block text-sm font-medium text-zinc-800 dark:text-white">{{.}}</label>{{end}}
+{{define "fe-err"}}<p class="mt-1 text-xs text-red-600 dark:text-red-400" x-show="errors[{{.}}]" x-text="errors[{{.}}]" x-cloak></p>{{end}}
+{{define "fe-btn-xs"}}inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-zinc-700 hover:bg-zinc-800/5 dark:text-zinc-200 dark:hover:bg-white/10{{end}}
+{{define "icon-grip"}}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4"><circle cx="5" cy="3" r="1.3"/><circle cx="11" cy="3" r="1.3"/><circle cx="5" cy="8" r="1.3"/><circle cx="11" cy="8" r="1.3"/><circle cx="5" cy="13" r="1.3"/><circle cx="11" cy="13" r="1.3"/></svg>{{end}}
+{{define "icon-minus"}}<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/></svg>{{end}}
+{{define "icon-plus"}}<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>{{end}}
+{{define "icon-duplicate"}}<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75"/></svg>{{end}}
+{{define "icon-pencil"}}<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125"/></svg>{{end}}
+{{define "icon-language"}}<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m10.5 21 5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 0 1-3.827-5.802"/></svg>{{end}}
+{{define "icon-exclamation"}}<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>{{end}}
+
+{{/* field-editor: dict Depth F(nama var Alpine field) S(ekspresi array sibling) P(ekspresi prefix error) Top(bool) TabX SecX(ekspresi tab/section grup, hanya Top) */}}
+{{define "field-editor"}}{{$f := .F}}{{$s := .S}}{{$p := .P}}{{$d := .Depth}}
+<div :draggable="armed==={{$f}}._uid" @dragstart.stop="dragStart($event, {{$s}}, {{$f}})" @dragend="armed=null; drag=null; dragSec=null" @dragover.prevent @drop.prevent.stop="{{if .Top}}dropTop({{$f}}, {{.TabX}}, {{.SecX}}){{else}}dropSub({{$s}}, {{$f}}){{end}}"
+  class="rounded-lg border border-gray-200 bg-gray-100 px-1.5 py-1 dark:border-zinc-600 dark:bg-zinc-800">
+  <div class="flex w-full items-center justify-between gap-1 rounded-lg">
+    <span @mousedown="armed={{$f}}._uid" @mouseup="armed=null" class="flex h-full cursor-grab items-center px-1 text-zinc-400 hover:text-zinc-600 active:cursor-grabbing dark:hover:text-zinc-300" title="Drag to reorder">{{template "icon-grip"}}</span>
+    <p class="flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-x-1.5 self-center break-words rounded-md px-3 py-1.5 text-sm font-medium hover:bg-black/5" @click="{{$f}}._c = !{{$f}}._c">
+      <span x-text="title({{$f}})"></span><span class="text-xs text-zinc-400" x-text="'(' + typeLabel({{$f}}.type) + ')'"></span>
+    </p>
+    <div class="flex shrink-0 flex-wrap justify-end gap-1.5">
+      <div class="flex items-center gap-2">
+        <span x-show="{{$f}}.localizable" class="text-blue-700" title="Localizable">{{template "icon-language"}}</span>
+        <span x-show="{{$f}}.required" class="text-red-500" title="Required">{{template "icon-exclamation"}}</span>
+      </div>
+      <button type="button" class="{{template "fe-btn-xs"}}" @click="{{$f}}._c = !{{$f}}._c"><span x-show="!{{$f}}._c">{{template "icon-minus"}}</span><span x-show="{{$f}}._c" x-cloak>{{template "icon-plus"}}</span></button>
+      <button type="button" class="{{template "fe-btn-xs"}}" title="Duplicate" @click="duplicate({{$s}}, {{$f}})">{{template "icon-duplicate"}}</button>
+      <button type="button" class="{{template "fe-btn-xs"}}" title="Delete" @click="pending={list: {{$s}}, uid: {{$f}}._uid}; $refs.confirmField.showModal()">{{template "icon-trash"}}</button>
+    </div>
+  </div>
+
+  <div x-show="!{{$f}}._c" x-cloak>
+    <div class="mb-6 mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div :class="{{$f}}.type === 'fieldset' ? '' : 'sm:col-span-2'">{{template "fe-label" "Type"}}
+        <select x-model="{{$f}}.type" @change="typeChanged({{$f}})" class="{{template "fe-cls"}}"><template x-for="t in ed.fieldtypes" :key="t.Value"><option :value="t.Value" x-text="t.Label" :selected="t.Value === {{$f}}.type"></option></template></select>
+      </div>
+
+      <template x-if="{{$f}}.type === 'fieldset'">
+        <div>{{template "fe-label" "Fieldset"}}
+          <select x-model="{{$f}}.options" class="{{template "fe-cls"}}"><option value="">Select a fieldset</option>
+            <template x-for="h in lk.fieldsets" :key="h"><option :value="h" x-text="h" :disabled="h !== {{$f}}.options && inUse(h)" :selected="h === {{$f}}.options" class="disabled:text-red-500"></option></template></select>
+          {{template "fe-err" (print $p "+'.options'")}}
+          <p x-show="!lk.fieldsets.length" class="mt-1 block text-xs text-zinc-500">No fieldsets yet — create one in the Fieldsets manager first.</p>
+        </div>
+      </template>
+      <template x-if="{{$f}}.type !== 'fieldset'">
+        <div class="contents">
+          <div>{{template "fe-label" "Label"}}<input x-model="{{$f}}.display" placeholder="Title" class="{{template "fe-cls"}}">{{template "fe-err" (print $p "+'.display'")}}</div>
+          <div>
+            <div class="flex items-end gap-1"><div class="flex-1">{{template "fe-label" "Handle"}}<input x-model="{{$f}}.handle" placeholder="title" class="{{template "fe-cls"}}"></div>
+              <button type="button" class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-800/5 dark:text-zinc-300 dark:hover:bg-white/10" title="Regenerate from label" @click="{{$f}}.handle = slug({{$f}}.display)">{{template "icon-refresh"}}</button></div>
+            {{template "fe-err" (print $p "+'.handle'")}}
+          </div>
+          <div class="flex flex-wrap items-center justify-start gap-4 text-sm">
+            <label class="flex items-center gap-2"><input type="checkbox" x-model="{{$f}}.required" class="size-4 rounded border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700">Required</label>
+            <label class="flex items-center gap-2"><input type="checkbox" x-model="{{$f}}.sometimes" class="size-4 rounded border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700">Sometimes</label>
+            <label class="flex items-center gap-2"><input type="checkbox" x-model="{{$f}}.localizable" class="size-4 rounded border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700">Localizable</label>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <template x-if="{{$f}}.type === 'select' || {{$f}}.type === 'radio'">
+      <div class="mt-3">{{template "fe-label" "Options (comma separated)"}}<input x-model="{{$f}}.options" placeholder="draft, published, archived" class="{{template "fe-cls"}}"></div>
+    </template>
+    <template x-if="{{$f}}.type === 'checkbox'">
+      <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div>{{template "fe-label" "Options (comma separated)"}}<input x-model="{{$f}}.options" placeholder="draft, published, archived" class="{{template "fe-cls"}}"></div>
+        <div>{{template "fe-label" "Min selections"}}<input type="number" min="0" x-model="{{$f}}.min_items" placeholder="No minimum" class="{{template "fe-cls"}}">{{template "fe-err" (print $p "+'.min_items'")}}</div>
+        <div>{{template "fe-label" "Max selections"}}<input type="number" min="0" x-model="{{$f}}.max_items" placeholder="No maximum" class="{{template "fe-cls"}}">{{template "fe-err" (print $p "+'.max_items'")}}</div>
+      </div>
+    </template>
+    <template x-if="{{$f}}.type === 'assets'">
+      <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div>{{template "fe-label" "Asset container"}}
+          <select x-model="{{$f}}.options" class="{{template "fe-cls"}}"><option value="">Select a container</option><template x-for="c in lk.assetContainers" :key="c.Value"><option :value="c.Value" x-text="c.Label" :selected="c.Value === {{$f}}.options"></option></template></select>
+          {{template "fe-err" (print $p "+'.options'")}}
+        </div>
+        <div>{{template "fe-label" "Min items"}}<input type="number" min="0" x-model="{{$f}}.min_items" placeholder="No minimum" class="{{template "fe-cls"}}">{{template "fe-err" (print $p "+'.min_items'")}}</div>
+        <div>{{template "fe-label" "Max items"}}<input type="number" min="0" x-model="{{$f}}.max_items" placeholder="No maximum" class="{{template "fe-cls"}}">{{template "fe-err" (print $p "+'.max_items'")}}</div>
+      </div>
+    </template>
+    <template x-if="{{$f}}.type === 'link'">
+      <div class="mt-3">{{template "fe-label" "Allowed collections (comma separated, blank = any)"}}<input x-model="{{$f}}.options" placeholder="pages, blog" class="{{template "fe-cls"}}">
+        {{template "fe-err" (print $p "+'.options'")}}
+        <p x-show="lk.collections.length" class="mt-1 block text-xs text-zinc-500" x-text="'Available: ' + lk.collections.map(c => c.Value).join(', ')"></p>
+      </div>
+    </template>
+    <template x-if="{{$f}}.type === 'taxonomy'">
+      <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div>{{template "fe-label" "Taxonomy"}}
+          <select x-model="{{$f}}.options" class="{{template "fe-cls"}}"><option value="">Select a taxonomy</option><template x-for="t in lk.taxonomies" :key="t.Value"><option :value="t.Value" x-text="t.Label" :selected="t.Value === {{$f}}.options"></option></template></select>
+          {{template "fe-err" (print $p "+'.options'")}}
+          <p x-show="!lk.taxonomies.length" class="mt-1 block text-xs text-zinc-500">No taxonomies yet — create one in the Taxonomies manager first.</p>
+        </div>
+        <div>{{template "fe-label" "Min selections"}}<input type="number" min="0" x-model="{{$f}}.min_items" placeholder="No minimum" class="{{template "fe-cls"}}">{{template "fe-err" (print $p "+'.min_items'")}}</div>
+        <div>{{template "fe-label" "Max selections"}}<input type="number" min="0" x-model="{{$f}}.max_items" placeholder="No maximum" class="{{template "fe-cls"}}">{{template "fe-err" (print $p "+'.max_items'")}}</div>
+      </div>
+    </template>
+    <template x-if="{{$f}}.type === 'bard'">
+      <div class="mt-3">{{template "fe-label" "Toolbar buttons"}}<p class="mb-2 text-xs text-zinc-500">Leave all unchecked to show every button.</p>
+        <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm"><template x-for="b in ed.bardToolbarButtons" :key="b.Value"><label class="flex items-center gap-2"><input type="checkbox" :value="b.Value" x-model="{{$f}}.toolbar" class="size-4 rounded border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700"><span x-text="b.Label"></span></label></template></div>
+      </div>
+    </template>
+    <template x-if="{{$f}}.type === 'replicator'">
+      <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div>{{template "fe-label" "Max rows"}}<input type="number" min="0" x-model="{{$f}}.max_items" placeholder="No maximum" class="{{template "fe-cls"}}">{{template "fe-err" (print $p "+'.max_items'")}}</div>
+        <div class="flex items-end pb-1.5 sm:col-span-2">{{template "switch" (dict "Label" "Collapse rows by default" "Name" "" "Model" (print $f ".collapsed_by_default"))}}</div>
+      </div>
+    </template>
+
+    <template x-if="{{$f}}.type !== 'fieldset'">
+      <div>
+        <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>{{template "fe-label" "Placeholder"}}
+            <input x-show="!noPlaceholder({{$f}}.type)" x-model="{{$f}}.placeholder" placeholder="e.g. Enter a title" class="{{template "fe-cls"}}">
+            <input x-show="noPlaceholder({{$f}}.type)" x-cloak disabled placeholder="Not applicable for this type" class="{{template "fe-cls"}}">
+          </div>
+          <div>
+            <template x-if="noDefault({{$f}}.type)"><div>{{template "fe-label" "Default value"}}<input disabled placeholder="Not applicable for this type" class="{{template "fe-cls"}}"></div></template>
+            <template x-if="{{$f}}.type === 'toggle'"><div>{{template "fe-label" "Default value"}}<div class="flex h-9 items-center gap-4 text-sm">
+              <label class="flex items-center gap-2"><input type="radio" value="true" x-model="{{$f}}.default" class="size-4 border-zinc-300 dark:border-zinc-600">True</label>
+              <label class="flex items-center gap-2"><input type="radio" value="false" x-model="{{$f}}.default" class="size-4 border-zinc-300 dark:border-zinc-600">False</label></div></div></template>
+            <template x-if="{{$f}}.type === 'select' || {{$f}}.type === 'radio'"><div>{{template "fe-label" "Default value"}}
+              <select x-model="{{$f}}.default" class="{{template "fe-cls"}}"><option value="">None</option><template x-for="o in opts({{$f}})" :key="o"><option :value="o" x-text="o" :selected="o === {{$f}}.default"></option></template></select></div></template>
+            <template x-if="{{$f}}.type === 'checkbox'"><div>{{template "fe-label" "Default value(s)"}}<input x-model="{{$f}}.default" placeholder="Comma separated, from the options above" class="{{template "fe-cls"}}"></div></template>
+            <template x-if="{{$f}}.type === 'date'"><div>{{template "fe-label" "Default value"}}<input type="date" x-model="{{$f}}.default" class="{{template "fe-cls"}}"></div></template>
+            <template x-if="!noDefault({{$f}}.type) && !['toggle','select','radio','checkbox','date'].includes({{$f}}.type)"><div>{{template "fe-label" "Default value"}}<input x-model="{{$f}}.default" class="{{template "fe-cls"}}"></div></template>
+            {{template "fe-err" (print $p "+'.default'")}}
+          </div>
+          <div>{{template "fe-label" "Validation rules"}}<input x-model="{{$f}}.validation" placeholder="max:255|email" class="{{template "fe-cls"}}">{{template "fe-err" (print $p "+'.validation'")}}</div>
+          <div>{{template "fe-label" "Instructions"}}<input x-model="{{$f}}.instructions" placeholder="Help text shown to editors" class="{{template "fe-cls"}}"></div>
+        </div>
+
+        <div class="mt-3 grid grid-cols-1 gap-3 rounded-md border border-gray-300 bg-gray-100 p-2 sm:flex sm:flex-wrap sm:items-start dark:border-zinc-600 dark:bg-zinc-800/50">
+          <div>{{template "fe-label" "Condition"}}<select x-model="{{$f}}.condition_mode" @change="condChanged({{$f}})" class="{{template "fe-cls"}}"><option value="always">Always show</option><option value="show">Show when</option><option value="hide">Hide when</option></select></div>
+          <template x-if="{{$f}}.condition_mode !== 'always'">
+            <div class="contents">
+              <div>{{template "fe-label" "Field"}}<select x-model="{{$f}}.condition_field" class="{{template "fe-cls"}}"><option value="">Select a field</option>
+                <template x-for="o in {{$s}}.filter(o => o !== {{$f}} && o.handle)" :key="o._uid"><option :value="o.handle" x-text="o.handle" :selected="o.handle === {{$f}}.condition_field"></option></template></select>{{template "fe-err" (print $p "+'.condition_field'")}}</div>
+              <div>{{template "fe-label" "Operator"}}<select x-model="{{$f}}.condition_operator" class="{{template "fe-cls"}}"><template x-for="o in ed.conditionOperators" :key="o.Value"><option :value="o.Value" x-text="o.Label" :selected="o.Value === {{$f}}.condition_operator"></option></template></select>{{template "fe-err" (print $p "+'.condition_operator'")}}</div>
+              <div>{{template "fe-label" "Value"}}<input x-model="{{$f}}.condition_value" class="{{template "fe-cls"}}">{{template "fe-err" (print $p "+'.condition_value'")}}</div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    {{if lt $d 5}}
+    <template x-if="{{$f}}.type === 'replicator'">
+      <div class="mt-3 space-y-2 rounded-md border border-dashed border-zinc-300 p-3 dark:border-zinc-600">
+        <div class="flex items-center justify-between"><p class="text-xs font-medium text-zinc-500">Replicator fields</p>{{template "button" (dict "Label" "Add field" "Size" "sm" "Attrs" (safe (print `@click="addSub(` $f `)"`)))}}</div>
+        {{template "fe-err" (print $p "+'.replicator_fields'")}}
+        <div class="space-y-2" @dragover.prevent @drop.prevent="dropSub({{$f}}.replicator_fields, null)">
+          <template x-for="{{print "f" (inc $d)}} in {{$f}}.replicator_fields" :key="{{print "f" (inc $d)}}._uid">
+            {{template "field-editor" (dict "Depth" (inc $d) "F" (print "f" (inc $d)) "S" (print $f ".replicator_fields") "P" (print "(" $p "+'.replicator_fields.'+" $f ".replicator_fields.indexOf(f" (inc $d) "))") "Top" false)}}
+          </template>
+        </div>
+      </div>
+    </template>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{/* field-builder-js: fungsi Alpine fieldBuilder(state, lookups, editorLists, extra) = HasFieldBuilder + BlueprintForm (tabs/sections). */}}
+{{define "field-builder-js"}}<script>
+window.fieldBuilder = function (st, lk, ed, extra) {
+  const NO_PLACEHOLDER = ['toggle','date','replicator','assets','fieldset','taxonomy','author'];
+  const NO_DEFAULT = ['replicator','assets','link','fieldset','taxonomy','author'];
+  const KEEP_OPTIONS = ['select','radio','checkbox','assets','link','fieldset','taxonomy'];
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  return {
+    ...st, errors: st.errors || {}, lk, ed, ...(extra || {}),
+    editingTab: null, newTab: null, editingSection: null, newSection: null,
+    pending: null, deleteTab: null, deleteSection: null, armed: null, drag: null, dragSec: null,
+    init() {
+      this.walk(this.fields, f => f._c = !!this.fieldsCollapsedByDefault && !Object.keys(this.errors || {}).length);
+      this.$watch('fieldsCollapsedByDefault', v => this.setAll(!!v));
+    },
+    uid() { return Math.random().toString(36).slice(2, 14); },
+    defaults() { return {_uid: this.uid(), handle: '', display: '', type: 'text', required: false, localizable: false, options: '', placeholder: '', default: '', validation: '', instructions: '', sometimes: false, condition_mode: 'always', condition_field: '', condition_operator: 'equals', condition_value: '', min_items: '', max_items: '', collapsed_by_default: false, toolbar: [], tab: 'main', section: '', replicator_fields: [], _c: false}; },
+    walk(list, fn) { (list || []).forEach(f => { fn(f); this.walk(f.replicator_fields, fn); }); },
+    setAll(c) { this.walk(this.fields, f => f._c = c); },
+    payload() { return JSON.stringify({id: this.id, namespace: this.namespace || '', handle: this.handle, template: this.template || '', fieldsCollapsedByDefault: !!this.fieldsCollapsedByDefault, tabs: this.tabs, fields: this.fields}); },
+    // ---- fields (HasFieldBuilder) ----
+    addField(tab, section) { this.fields.push({...this.defaults(), tab: tab || 'main', section: section || ''}); },
+    addSub(f) { f.replicator_fields.push(this.defaults()); },
+    removeField() { const p = this.pending; this.pending = null; if (!p) return; const i = p.list.findIndex(f => f._uid === p.uid); if (i > -1) p.list.splice(i, 1); },
+    duplicate(list, f) {
+      const copy = JSON.parse(JSON.stringify(f));
+      const fresh = x => { x._uid = this.uid(); (x.replicator_fields || []).forEach(fresh); };
+      fresh(copy); copy.handle = f.handle ? f.handle + '_copy' : '';
+      list.splice(list.indexOf(f) + 1, 0, copy);
+    },
+    typeChanged(f) {
+      f.default = '';
+      if (NO_PLACEHOLDER.includes(f.type)) f.placeholder = '';
+      if (f.type !== 'replicator') f.replicator_fields = [];
+      if (!KEEP_OPTIONS.includes(f.type)) f.options = '';
+    },
+    condChanged(f) { if (f.condition_mode === 'always') { f.condition_field = ''; f.condition_operator = 'equals'; f.condition_value = ''; } },
+    noPlaceholder(t) { return NO_PLACEHOLDER.includes(t); },
+    noDefault(t) { return NO_DEFAULT.includes(t); },
+    opts(f) { return (f.options || '').split(',').map(s => s.trim()).filter(Boolean); },
+    typeLabel(t) { return (this.ed.fieldtypes.find(x => x.Value === t) || {Label: t}).Label; },
+    title(f) { return f.type === 'fieldset' ? (f.options || 'Untitled field') : (f.display || f.handle || 'Untitled field'); },
+    inUse(h) { let n = 0; this.walk(this.fields, f => { if (f.type === 'fieldset' && f.options === h) n++; }); return n > 0; },
+    groupFields(tab, section) { return this.fields.filter(f => (f.tab || 'main') === tab && (f.section || '') === section); },
+    slug(s) { return (s || '').toLowerCase().replace(/[^a-z\s_]/g, '').trim().replace(/\s+/g, '_').replace(/_+/g, '_'); },
+    // ---- drag & drop (pengganti wire:sort) ----
+    dragStart(e, list, f) { this.drag = {list, uid: f._uid}; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', f._uid); }, // setData wajib agar Firefox memulai drag
+    dropSub(list, target) {
+      const d = this.drag; this.drag = null; this.armed = null;
+      if (!d || d.list !== list) return;
+      const from = list.findIndex(x => x._uid === d.uid); if (from < 0) return;
+      const moved = list.splice(from, 1)[0];
+      const pos = target ? list.indexOf(target) : list.length;
+      list.splice(pos, 0, moved);
+    },
+    // = reorderTopLevelFields(): slot absolut grup tetap, hanya nilainya yang berpindah; drop ke grup lain memindahkan tab/section.
+    dropTop(target, tab, section) {
+      const d = this.drag; this.drag = null; this.armed = null;
+      if (!d || d.list !== this.fields) return;
+      const moved = this.fields.find(x => x._uid === d.uid); if (!moved || moved === target) return;
+      moved.tab = tab; moved.section = section;
+      const idxs = this.fields.map((f, i) => i).filter(i => (this.fields[i].tab || 'main') === tab && (this.fields[i].section || '') === section);
+      const vals = idxs.map(i => this.fields[i]);
+      vals.splice(vals.indexOf(moved), 1);
+      vals.splice(target ? vals.indexOf(target) : vals.length, 0, moved);
+      idxs.forEach((abs, k) => this.fields[abs] = vals[k]);
+    },
+    dropSection(t, s) { const d = this.dragSec; this.dragSec = null; if (!d || d.t !== t) return; const secs = this.tabs[t].sections; const moved = secs.splice(d.s, 1)[0]; secs.splice(s === null ? secs.length : s, 0, moved); this.editingSection = null; },
+    // ---- tabs & sections (BlueprintForm) ----
+    addTab() { this.tabs.push({handle: '', display: '', sections: []}); this.editingTab = this.tabs.length - 1; this.newTab = this.editingTab; },
+    confirmTab() { if (this.editingTab === this.newTab) this.newTab = null; this.editingTab = null; },
+    cancelTab(i) { if (this.newTab === i) { this.newTab = null; this.removeTab(i); return; } this.editingTab = null; },
+    removeTab(i) {
+      if (i === 0 || i === null) return;
+      const h = this.tabs[i].handle;
+      this.fields.forEach(f => { if ((f.tab || 'main') === h) { f.tab = 'main'; f.section = ''; } });
+      this.tabs.splice(i, 1);
+      if (this.editingTab === i) this.editingTab = null;
+      if (this.editingSection && this.editingSection[0] === i) this.editingSection = null;
+    },
+    addSection(t) { this.tabs[t].sections.push({handle: '', display: ''}); this.editingSection = [t, this.tabs[t].sections.length - 1]; this.newSection = this.editingSection; },
+    isEditingSection(t, s) { return same(this.editingSection, [t, s]); },
+    confirmSection() { if (same(this.editingSection, this.newSection)) this.newSection = null; this.editingSection = null; },
+    cancelSection(t, s) { if (same(this.newSection, [t, s])) { this.newSection = null; this.removeSection(t, s); return; } this.editingSection = null; },
+    removeSection(t, s) {
+      if (t === null || s === null) return;
+      const th = this.tabs[t].handle, sh = this.tabs[t].sections[s].handle;
+      this.fields.forEach(f => { if ((f.tab || 'main') === th && (f.section || '') === sh) f.section = ''; });
+      this.tabs[t].sections.splice(s, 1);
+      if (this.isEditingSection(t, s)) this.editingSection = null;
+    },
+  };
+};
+</script>{{end}}
+
+{{/* fe-toolbar: bar sticky di atas daftar field. dict AddLabel AddAttrs */}}
+{{define "fe-toolbar"}}<div class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 rounded-b-xl border bg-white p-2 dark:border-zinc-700 dark:bg-zinc-900">
+  {{template "switch" (dict "Label" "Collapse fields by default" "Name" "" "Model" "fieldsCollapsedByDefault")}}
+  <div class="flex flex-wrap gap-2">
+    {{template "button" (dict "Label" "Collapse all" "Size" "sm" "Variant" "ghost" "Attrs" (safe `@click="setAll(true)"`))}}
+    {{template "button" (dict "Label" "Expand all" "Size" "sm" "Variant" "ghost" "Attrs" (safe `@click="setAll(false)"`))}}
+    {{template "button" (dict "Label" .AddLabel "Size" "sm" "Attrs" .AddAttrs)}}
+  </div>
+</div>{{end}}
+
+{{/* fe-confirm: dialog konfirmasi. dict Ref Title Text Attrs(tombol Delete) */}}
+{{define "fe-confirm"}}<dialog x-ref="{{.Ref}}" class="m-auto w-[22rem] max-w-[calc(100vw-2rem)] rounded-xl border border-zinc-200 bg-white p-4 text-zinc-800 shadow-xl backdrop:bg-zinc-900/40 backdrop:backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" @click.self="$el.close()">
+  <div class="space-y-4"><h2 class="text-lg font-semibold">{{.Title}}</h2>{{template "subheading" .Text}}
+    <div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Attrs" (safe `onclick="this.closest('dialog').close()"`))}}{{template "button" (dict "Label" "Delete" "Variant" "danger" "Attrs" .Attrs)}}</div></div>
+</dialog>{{end}}
