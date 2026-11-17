@@ -1,24 +1,4 @@
 {{template "app" .}}
 {{define "title"}}Media Library{{end}}
-{{define "content"}}
-<section class="w-full space-y-6">
-{{template "page-header" (dict "Title" "Media Library" "Action" (safe ``))}}
-<div class="grid gap-4 md:grid-cols-[220px_1fr]">
-  <div class="space-y-4">{{template "card-open"}}<nav class="grid gap-px p-2 text-sm">{{range .Containers}}<a href="{{$.CP}}/media?container={{index . "handle"}}" class="rounded-lg px-3 py-2 {{if eq (index . "handle") $.Container}}bg-zinc-100 font-medium dark:bg-zinc-700{{else}}text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-700/50{{end}}">{{index . "title"}}</a>{{else}}<p class="px-3 py-2 text-zinc-500">No containers yet.</p>{{end}}</nav>{{template "card-close"}}
-  {{template "button" (dict "Label" "New container" "Size" "sm" "Attrs" (safe `onclick="document.getElementById('newc').showModal()"`))}}</div>
-  <div class="space-y-4">{{if .Container}}
-    <form method="post" action="{{.CP}}/media/upload?container={{.Container}}" enctype="multipart/form-data" class="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-zinc-300 p-4 text-sm dark:border-zinc-600">
-      <input type="file" name="file" required multiple class="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium dark:file:bg-zinc-700">{{template "button" (dict "Label" "Upload" "Variant" "primary" "Size" "sm" "Type" "submit")}}</form>
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{{range .Assets}}
-      <div class="group relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700">
-        {{if or (eq (index . "extension") "jpg") (eq (index . "extension") "jpeg") (eq (index . "extension") "png") (eq (index . "extension") "gif") (eq (index . "extension") "webp") (eq (index . "extension") "svg")}}<img src="/storage/{{index . "container"}}/{{index . "path"}}" alt="" class="aspect-square w-full object-cover">{{else}}<div class="grid aspect-square place-items-center bg-zinc-100 text-xs uppercase text-zinc-500 dark:bg-zinc-700">{{index . "extension"}}</div>{{end}}
-        <div class="flex items-center justify-between gap-1 px-2 py-1.5 text-xs"><a href="{{$.CP}}/media/file/{{index . "container"}}/{{index . "path"}}" target="_blank" class="truncate hover:underline">{{index . "basename"}}</a>
-        <form method="post" action="{{$.CP}}/media/{{index . "id"}}/delete" onsubmit="return confirm('Delete?')"><button class="text-zinc-400 hover:text-red-500" aria-label="Delete">{{template "icon-x"}}</button></form></div></div>
-    {{else}}<p class="col-span-full py-10 text-center text-sm text-zinc-500">Empty. Upload your first file.</p>{{end}}</div>
-  {{else}}{{template "callout" (dict "Text" "Create a container to start uploading.")}}{{end}}</div>
-</div>
-{{template "modal-open" "newc"}}{{template "modal-x"}}<form method="post" action="{{.CP}}/media/containers" class="space-y-6"><h2 class="text-lg font-semibold">New container</h2>
-{{template "input" (dict "Label" "Handle" "Name" "handle" "Type" "text" "Required" true "Placeholder" "images")}}{{template "input" (dict "Label" "Title" "Name" "title" "Type" "text" "Required" true)}}
-<div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Attrs" (safe `onclick="this.closest('dialog').close()"`))}}{{template "button" (dict "Label" "Create" "Variant" "primary" "Type" "submit")}}</div></form>{{template "modal-close"}}
-</section>
-{{end}}
+{{define "content"}}<media-library data-cp="{{.CP}}"></media-library>
+{{vite "resources/ts/media/main.tsx"}}{{end}}
