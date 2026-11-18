@@ -1,32 +1,45 @@
----
-// Template blueprint "pages.static.homepage". Props = view() di PageController: entry, data, site.
-// Directive lama → fungsi cms.ts: @global → globalSet, @sites → sites, @collection → collection, @taxonomy → taxonomy, @navigation → navigation.
-import Site from '../../../layouts/Site.astro';
-import { collection, globalSet, sites, taxonomy } from '../../../cms';
-const { data, site } = Astro.props;
-const global = await globalSet('site_settings', { site: site?.handle });
-const pages = await collection('pages', { site: site?.handle, sort: 'date:desc', limit: 5 });
-console.log(data.hero_image)
----
+<main style="max-width:40rem;margin:4rem auto;padding:0 1rem">
+   <h1>{data.title}</h1>
+   {data.about_page}
+   {data.subheading && <p>{data.subheading}</p>}
+   <div set:html={data.content} />
 
+   {data.hero_text}
+   {data.hero_image?.alt}
 
-<Site title={data.heading ?? data.title} site={site}>
-   <main style="max-width:40rem;margin:4rem auto;padding:0 1rem">
-      <h1>{data.title}</h1>
-      {data.about_page}
-      {data.subheading && <p>{data.subheading}</p>}
-      <div set:html={data.content} />
+   {global.global_sidebar?.site_image && (
+      <img src={global.global_sidebar.site_image.url} alt={global.global_sidebar.site_image.alt} width={global.global_sidebar.site_image.width} height={global.global_sidebar.site_image.height} loading={global.global_sidebar.site_image.loading} />
+   )}
 
-      {data.hero_text}
-      {data.hero_image.url}
-      <!-- <img src={data.hero_image.url} alt=""> -->
-      
+   <h2>global.global_sidebar.menu_loop</h2>
+   <ul>
+      {global.global_sidebar?.menu_loop?.filter((m: any) => m._enabled).map((menu: any) => (
+         <li>
+            {menu.menu_label}
+            <ul>{menu.menu_child_menu?.filter((c: any) => c._enabled).map((child: any) => <li>{child.menu_child_label}</li>)}</ul>
+         </li>
+      ))}
+   </ul>
 
-      {global && <pre>{JSON.stringify(global, null, 2)}</pre>}
-      <ul>{(await sites()).map((s) => <li>{s.name} ({s.handle})</li>)}</ul>
-      <!-- <ul>{pages.map((e) => <li>{e.data.heading ?? e.data.title ?? e.slug}</li>)}</ul> -->
-      <!-- <ul>{(await taxonomy('categories')).map((t) => <li>{t.data.title ?? t.slug}</li>)}</ul> -->
+   <!-- <h2>navigation.header</h2>
+   <pre>{JSON.stringify(navigation.header, null, 2)}</pre>
 
-      <a href="http://127.0.0.1:8000/admin-panel/login" target="_blank">Login Here</a>
-   </main>
-</Site>
+   <h2>collection.pages</h2>
+   <ul>{collection.pages?.slice(0, 5).map((e: any) => <li><a href={e.url}>{e.data.heading ?? e.data.title ?? e.slug}</a></li>)}</ul>
+
+   <h2>taxonomy.categories</h2>
+   <ul>{taxonomy.categories?.map((t: any) => <li>{t.data.title ?? t.slug}</li>)}</ul>
+
+   <h2>sites</h2>
+   <ul>{sites.map((s: any) => <li>{s.name} ({s.handle})</li>)}</ul> -->
+<hr>
+
+   {navigation.header?.site_name}
+<hr>
+   <br>
+
+   {navigation.header.menu_loop?.map((menu) => (
+      <h1>{menu.menu_label}</h1>
+   ))}
+  
+</main>

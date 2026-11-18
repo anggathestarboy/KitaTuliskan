@@ -1,7 +1,9 @@
 ---
 // = PageController::show: render entry published di path ini; view dari blueprint.data.template ("pages.static.homepage"),
-// props sama seperti view() lama: entry, data, site. Dirender per request, jadi page baru langsung live.
-import { api, blueprint, entryData, entryPath, json, sites, type Entry } from '../cms';
+// view tidak menerima props dan tidak butuh frontmatter: variabelnya (data, global, navigation, collection, taxonomy, site, sites) disisipkan plugins/template-scope.mjs dari Astro.locals.
+// Layout (header/footer) dibungkus di sini, jadi view hanya berisi isi halaman. Dirender per request, jadi page baru langsung live.
+import Site from '../layouts/Site.astro';
+import { api, blueprint, context, entryData, entryPath, json, type Entry } from '../cms';
 
 const views = import.meta.glob('../views/pages/**/*.astro');
 const path = Astro.params.slug ?? '';
@@ -13,7 +15,7 @@ for (const e of (await api('entries')) as Entry[]) {
   if (load) { found = { View: ((await load()) as { default: any }).default, entry: e }; break; }
 }
 if (!found) Astro.response.status = 404; // = NotFoundHttpException di PageController
-const site = found && (await sites()).find((s) => s.handle === found!.entry.site);
+if (found) Object.assign(Astro.locals, await context(found.entry.site), { entry: found.entry, data: await entryData(found.entry) });
 ---
 
-{found ? <found.View entry={found.entry} data={await entryData(found.entry)} site={site} /> : <h1>404 Not Found</h1>}
+{found ? <Site><found.View /></Site> : <h1>404 Not Found</h1>}

@@ -69,7 +69,7 @@ export const entryData = async (e: Row): Promise<Row> => resolveAssets(json(e.da
 
 // @collection: hanya entry published (/api/entries sudah memfilternya).
 export async function collection(handle: string, o: Options = {}): Promise<Entry[]> {
-  let rows = await Promise.all((await api('entries')).filter((e) => e.collection === handle).map(async (e) => ({ ...e, data: await entryData(e) })));
+  let rows = await Promise.all((await api('entries')).filter((e) => e.collection === handle).map(async (e) => ({ ...e, url: '/' + (await entryPath(e)), data: await entryData(e) })));
   if (o.related) {
     const rel = typeof o.related === 'string' ? rows.find((e) => e.id === o.related) : o.related;
     const taxFields = json((await blueprint(rel?.blueprint))?.data).fields?.filter((f: Row) => f.type === 'taxonomy').map((f: Row) => f.handle) ?? [];
@@ -106,6 +106,28 @@ export async function navigation(handle: string, o: { site?: string } = {}): Pro
   const fields = await fieldsOf(`navigations.${handle}`);
   if (own) for (const f of fields) if (f.localizable && json(own.tree)[f.handle] !== undefined) data[f.handle] = json(own.tree)[f.handle];
   return resolveAssets(data, fields);
+}
+
+// Semua yang dibutuhkan template, format fitur.handle.field: global.global_sidebar.site_image.url, navigation.header.menu_loop,
+// collection.pages (daftar entry site ini), taxonomy.categories (daftar term), plus site, sites. collection/taxonomy juga tetap bisa
+// dipanggil sebagai fungsi dengan opsi: collection('pages', { sort: 'date:desc', limit: 5 }). Diisi ke Astro.locals oleh pages/[...slug].astro.
+// shortcut: semua collection/taxonomy dimuat tiap request (cache api 2 dtk); batasi ke handle yang dipakai bila datanya besar.
+export async function context(siteHandle?: string) {
+  const all = await sites(), site = all.find((s) => s.handle === siteHandle) ?? all[0];
+  const keyed = async (table: string, load: (handle: string, o: { site?: string }) => Promise<unknown>) =>
+    Object.fromEntries(await Promise.all((await api(table)).map(async (r) => [r.handle, await load(r.handle, { site: site?.handle })])));
+  const both = async <F extends (...a: any[]) => any>(fn: F, table: string, load: (h: string, o: { site?: string }) => Promise<unknown>) => {
+    const call = ((...a: Parameters<F>) => fn(...a)) as F & Record<string, any>;
+    for (const [h, v] of Object.entries(await keyed(table, load))) Object.defineProperty(call, h, { value: v, enumerable: true }); // defineProperty: handle "name"/"length" tidak bentrok
+    return call;
+  };
+  return {
+    site, sites: all,
+    global: await keyed('global_sets', globalSet),
+    navigation: await keyed('navigations', navigation),
+    collection: await both(collection, 'collections', collection),
+    taxonomy: await both(taxonomy, 'taxonomies', taxonomy),
+  };
 }
 
 export const formAction = (handle: string) => `${base}/!/forms/${handle}`;
