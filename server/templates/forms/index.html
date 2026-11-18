@@ -1,0 +1,65 @@
+{{template "app" .}}
+{{define "title"}}Forms{{end}}
+{{define "content"}}
+{{/* = form-manager.blade.php. Modal = form POST biasa; edit mengisi state Alpine dari JSON baris. fieldsBy = selectedBlueprintFields per blueprint. */}}
+<section class="w-full space-y-6" x-data="{deleteId:null, ctx:null, ctxX:0, ctxY:0, errors: {{json .Errors}}, bps: {{json .Blueprints}}, fieldsBy: {{json .FieldsByBlueprint}},
+  f: {id:0, handle:'', title:'', blueprintPick:'', createBlueprint:true, storeSubmissions:true, redirectUrl:'', previewFields:[]},
+  open(r){ this.f = r ? {...r, createBlueprint:false} : {id:0, handle:'', title:'', blueprintPick:'', createBlueprint:true, storeSubmissions:true, redirectUrl:'', previewFields:[]}; this.$refs.form.showModal() },
+  slug(){ this.f.handle = this.f.title.toLowerCase().trim().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') },
+  get bpFields(){ return (!this.f.createBlueprint && this.f.blueprintPick) ? (this.fieldsBy[this.f.blueprintPick] || []) : [] },
+  init(){ {{if .Form}}this.open({{json .Form}}); this.f.createBlueprint = {{json .Form.createBlueprint}};{{end}} }}" @click="ctx=null">
+  {{template "page-header" (dict "Title" "Forms" "Action" (safe `<button type="button" @click="open()" class="inline-flex h-8 items-center gap-2 rounded-lg border border-transparent bg-zinc-800 px-3 text-sm font-medium text-white shadow-xs hover:bg-zinc-700 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-200">New form</button>`))}}
+
+  {{template "card-open"}}
+  <table class="w-full">
+    <thead class="bg-zinc-100 dark:bg-zinc-900"><tr>{{template "th" "Title"}}{{template "th" "Handle"}}{{template "th" "Blueprint"}}{{template "th" "Submissions"}}<th class="last:rounded-tr-xl"></th></tr></thead>
+    <tbody>{{$cp := .CP}}{{range .Rows}}{{$id := index . "id"}}{{$h := index . "handle"}}
+    <tr class="{{template "tr-class"}}" @contextmenu.prevent.stop="ctx={{$id}}; ctxX=$event.clientX-20; ctxY=$event.clientY+10">
+      <td class="{{template "td-class"}}"><a href="{{$cp}}/forms/{{$h}}/submissions" class="hover:text-orange-700">{{index . "title"}}</a></td>
+      <td class="{{template "td-class"}}">{{$h}}</td><td class="{{template "td-class"}}">{{index . "blueprint"}}</td><td class="{{template "td-class"}}">{{index . "submissions"}}</td>
+      <td class="{{template "td-class"}} text-right"><div x-data="{open:false, pos:{}}" class="inline-block">{{template "ellipsis-trigger"}}{{template "menu-open"}}
+          {{template "menu-item" (dict "Label" "Submissions" "Icon" "inbox" "Href" (print $cp "/forms/" $h "/submissions"))}}
+          {{template "menu-item" (dict "Label" "Settings" "Icon" "cog" "Attrs" (safe (print `@click="open=false; $dispatch('edit', ` (jsonattr .) `)"`)))}}
+          {{template "menu-danger" (dict "Label" "Delete" "Icon" "trash" "Attrs" (safe (print `@click="open=false; deleteId=` $id `; $refs.confirm.showModal()"`)))}}
+        {{template "menu-close"}}</div>
+        <div x-show="ctx==={{$id}}" x-cloak @click.outside="ctx=null" :style="{left: ctxX+'px', top: ctxY+'px'}" class="fixed z-50 w-40 rounded-md border border-zinc-200 bg-white py-1 text-left shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+          <a href="{{$cp}}/forms/{{$h}}/submissions" class="block w-full px-3 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">Submissions</a>
+          <button type="button" @click.stop="ctx=null; $dispatch('edit', {{json .}})" class="block w-full px-3 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">Settings</button>
+          <button type="button" @click="ctx=null; deleteId={{$id}}; $refs.confirm.showModal()" class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-zinc-100 dark:hover:bg-zinc-800">Delete</button>
+        </div></td>
+    </tr>
+    {{else}}<tr><td colspan="5" class="px-3 py-10 text-center text-sm text-zinc-500">No forms yet.</td></tr>{{end}}</tbody>
+  </table>
+  {{template "card-close"}}
+
+  <dialog x-ref="form" @edit.window="open($event.detail)" class="m-auto w-full max-w-lg rounded-xl border border-zinc-200 bg-white p-4 text-zinc-800 shadow-xl backdrop:bg-zinc-900/40 backdrop:backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" @click.self="$el.close()">{{template "modal-x"}}
+  <form method="post" action="{{.CP}}/forms" class="space-y-6" @keydown.window.meta.s.prevent="$el.closest('dialog').open && $el.requestSubmit()" @keydown.window.ctrl.s.prevent="$el.closest('dialog').open && $el.requestSubmit()">
+    <h2 class="text-lg font-semibold" x-text="f.id ? 'Edit form' : 'New form'"></h2>
+    <input type="hidden" name="id" :value="f.id">
+    <div>{{template "input" (dict "Label" "Title" "Name" "title" "Placeholder" "Contact" "Required" true "Attrs" (safe `x-model="f.title"`))}}{{template "fe-err" "'title'"}}</div>
+    <div class="flex items-end gap-2"><div class="flex-1">{{template "input" (dict "Label" "Handle" "Name" "handle" "Placeholder" "contact" "Required" true "Attrs" (safe `x-model="f.handle"`))}}</div>
+      <button type="button" @click="slug()" class="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300" title="Regenerate from title">{{template "icon-refresh"}}</button></div>
+    {{template "fe-err" "'handle'"}}
+
+    <template x-if="!f.createBlueprint">
+      <div class="space-y-4">
+        <div>{{template "fe-label" "Blueprint"}}<select name="blueprint" x-model="f.blueprintPick" class="{{template "fe-cls"}} !h-10"><option value="">No blueprint</option><template x-for="b in bps" :key="b.handle"><option :value="b.handle" x-text="b.label" :selected="b.handle===f.blueprintPick"></option></template></select>{{template "fe-err" "'blueprint'"}}
+          <p x-show="!bps.length" class="mt-1 text-sm text-zinc-500">No blueprints yet — create one in the Blueprints module first.</p></div>
+        <div x-show="bpFields.length">{{template "fe-label" "Preview columns"}}<p class="mb-2 text-xs text-zinc-500">Which fields show as columns in the submissions table. Leave all unchecked to show every field.</p>
+          <div class="space-y-2 text-sm"><template x-for="fl in bpFields" :key="fl.handle"><label class="flex items-center gap-2"><input type="checkbox" name="preview_fields" :value="fl.handle" x-model="f.previewFields" class="size-4 rounded border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700"><span x-text="fl.display"></span></label></template></div></div>
+      </div>
+    </template>
+    <template x-if="!f.id">
+      <label class="flex items-start gap-3 text-sm"><input type="checkbox" name="create_blueprint" value="1" x-model="f.createBlueprint" class="mt-0.5 size-4 rounded border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700">
+        <span><span class="font-medium text-zinc-800 dark:text-white">Create a blueprint for this form</span><span class="block text-xs text-zinc-500 dark:text-zinc-400">Recommended — you'll add its fields right after saving. Turn off to pick an existing blueprint instead.</span></span></label>
+    </template>
+    <div>{{template "switch" (dict "Label" "Store submissions" "Name" "store_submissions" "Model" "f.storeSubmissions")}}<p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Save every successful submission to the Submissions table below.</p></div>
+    <div>{{template "input" (dict "Label" "Redirect URL" "Name" "redirect_url" "Placeholder" "https://example.com/thank-you" "Description" "Where a successful submission redirects to. Leave blank to redirect back to the page the form was on." "Attrs" (safe `x-model="f.redirectUrl"`))}}{{template "fe-err" "'redirect_url'"}}</div>
+    <div class="flex justify-end gap-2">{{template "button" (dict "Label" "Cancel" "Attrs" (safe `onclick="this.closest('dialog').close()"`))}}{{template "button" (dict "Label" "Save" "Variant" "primary" "Type" "submit")}}</div>
+  </form>
+  </dialog>
+
+  {{template "fe-confirm" (dict "Ref" "confirm" "Title" "Delete this form?" "Text" "This cannot be undone." "Attrs" (safe (print `@click="$refs.del.action='` .CP `/forms/'+deleteId+'/delete'; $refs.del.submit()"`)))}}
+  <form x-ref="del" method="post" class="hidden"></form>
+</section>
+{{end}}

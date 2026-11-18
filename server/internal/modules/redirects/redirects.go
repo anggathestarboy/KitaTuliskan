@@ -85,7 +85,7 @@ func Apply(a *web.App, w http.ResponseWriter, r *http.Request) bool {
 		hit := false
 		switch rd["match_type"] {
 		case "prefix":
-			if hit = strings.HasPrefix(path, src); hit && rd["keep_path"].(int64) == 1 {
+			if hit = strings.HasPrefix(path, src); hit && web.Int64(rd["keep_path"]) == 1 {
 				target = strings.TrimSuffix(target, "/") + strings.TrimPrefix(path, src)
 			}
 		case "regex":
@@ -97,7 +97,7 @@ func Apply(a *web.App, w http.ResponseWriter, r *http.Request) bool {
 		}
 		if hit {
 			a.DB.Exec(`UPDATE redirects SET hits=hits+1 WHERE id=?`, rd["id"])
-			http.Redirect(w, r, target, int(rd["status_code"].(int64)))
+			http.Redirect(w, r, target, int(web.Int64(rd["status_code"])))
 			return true
 		}
 	}

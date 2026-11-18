@@ -1,0 +1,20 @@
+{{template "app" .}}
+{{define "title"}}Submission{{end}}
+{{define "content"}}
+{{/* = submission-detail.blade.php: "Export PDF" = window.print(), chrome disembunyikan dengan print:hidden. */}}
+<section class="w-full max-w-3xl space-y-6">
+  <div class="flex flex-col items-center justify-between rounded-xl border border-zinc-200 px-4 py-2 sm:flex-row print:hidden dark:border-zinc-600">
+    <h1 class="text-xl font-semibold text-zinc-800 dark:text-white">Submission</h1>{{template "subheading" .Created}}
+  </div>
+  <div class="hidden print:block"><h2 class="text-lg font-semibold">{{.Form.Title}} — Submission</h2>{{template "subheading" .Created}}</div>
+  <div class="flex gap-2 overflow-x-auto print:hidden">
+    {{template "button" (dict "Label" "Export PDF" "Size" "sm" "Attrs" (safe `onclick="window.print()"`))}}
+    {{template "button" (dict "Label" "Export TXT" "Size" "sm" "Href" (print .CP "/forms/" .Form.Handle "/submissions/" .ID "/export/txt"))}}
+    {{template "button" (dict "Label" "Export JSON" "Size" "sm" "Href" (print .CP "/forms/" .Form.Handle "/submissions/" .ID "/export/json"))}}
+  </div>
+  <div class="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+    {{range .Values}}<div><p class="text-xs font-medium text-zinc-500">{{index . "label"}}</p><div class="block whitespace-pre-wrap text-sm text-zinc-500 dark:text-white/70">{{safe (print (index . "html"))}}</div></div>
+    {{else}}<p class="text-sm text-zinc-500">This form has no fields.</p>{{end}}
+  </div>
+</section>
+{{end}}

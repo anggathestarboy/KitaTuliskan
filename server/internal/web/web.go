@@ -357,3 +357,24 @@ func (a *App) resolvePages(items []SidebarItem) {
 
 // Itoa: int64 → string, untuk membandingkan id dari PathValue/form dengan id dari DB.
 func Itoa(i int64) string { return strconv.FormatInt(i, 10) }
+
+// Int64: angka dari Rows() bisa datang sebagai int64/uint64 (binary protocol, query dengan argumen) atau string (text protocol, query tanpa argumen).
+func Int64(v any) int64 {
+	switch t := v.(type) {
+	case int64:
+		return t
+	case uint64:
+		return int64(t)
+	case int:
+		return int64(t)
+	case float64:
+		return int64(t)
+	case string:
+		n, _ := strconv.ParseInt(t, 10, 64)
+		return n
+	case []byte:
+		n, _ := strconv.ParseInt(string(t), 10, 64)
+		return n
+	}
+	return 0
+}

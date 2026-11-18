@@ -1,0 +1,29 @@
+{{template "app" .}}
+{{define "title"}}Form Submissions{{end}}
+{{define "content"}}
+<section class="w-full space-y-6" x-data="{deleteId:null, ctx:null, ctxX:0, ctxY:0}" @click="ctx=null">
+  {{template "page-header" (dict "Title" (print .Form.Title " submissions"))}}
+  {{template "card-open"}}
+  <table class="w-full">
+    <thead class="bg-zinc-100 dark:bg-zinc-900"><tr>{{range .Cols}}{{template "th" (or (index . "display") (index . "handle"))}}{{end}}{{template "th" "Submitted"}}<th class="last:rounded-tr-xl"></th></tr></thead>
+    <tbody>{{$cp := .CP}}{{$h := .Form.Handle}}{{$n := len .Cols}}{{range .Rows}}{{$id := index . "id"}}{{$url := print $cp "/forms/" $h "/submissions/" $id}}
+    <tr class="{{template "tr-class"}}" @contextmenu.prevent.stop="ctx='{{$id}}'; ctxX=$event.clientX-20; ctxY=$event.clientY+10">
+      {{range index . "cells"}}<td class="{{template "td-class"}}">{{safe (print .)}}</td>{{end}}
+      <td class="{{template "td-class"}}"><a href="{{$url}}" class="hover:text-orange-700">{{index . "created"}}</a></td>
+      <td class="{{template "td-class"}} text-right"><div x-data="{open:false, pos:{}}" class="inline-block">{{template "ellipsis-trigger"}}{{template "menu-open"}}
+          {{template "menu-item" (dict "Label" "View" "Icon" "eye" "Href" $url)}}
+          {{template "menu-danger" (dict "Label" "Delete" "Icon" "trash" "Attrs" (safe (print `@click="open=false; deleteId='` $id `'; $refs.confirm.showModal()"`)))}}
+        {{template "menu-close"}}</div>
+        <div x-show="ctx==='{{$id}}'" x-cloak @click.outside="ctx=null" :style="{left: ctxX+'px', top: ctxY+'px'}" class="fixed z-50 w-40 rounded-md border border-zinc-200 bg-white py-1 text-left shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+          <a href="{{$url}}" class="block w-full px-3 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">View</a>
+          <button type="button" @click="ctx=null; deleteId='{{$id}}'; $refs.confirm.showModal()" class="block w-full px-3 py-1.5 text-left text-sm text-red-600 hover:bg-zinc-100 dark:hover:bg-zinc-800">Delete</button>
+        </div></td>
+    </tr>
+    {{else}}<tr><td colspan="{{inc (inc $n)}}" class="px-3 py-10 text-center text-sm text-zinc-500">No submissions yet.</td></tr>{{end}}</tbody>
+  </table>
+  {{template "card-close"}}
+
+  {{template "fe-confirm" (dict "Ref" "confirm" "Title" "Delete this submission?" "Text" "This cannot be undone." "Attrs" (safe (print `@click="$refs.del.action='` .CP `/forms/` .Form.Handle `/submissions/'+deleteId+'/delete'; $refs.del.submit()"`)))}}
+  <form x-ref="del" method="post" class="hidden"></form>
+</section>
+{{end}}

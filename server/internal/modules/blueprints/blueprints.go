@@ -295,7 +295,7 @@ func loadBlueprint(a *web.App, id string) (State, bool) {
 	row := rows[0]
 	var data map[string]any
 	json.Unmarshal([]byte(anyToString(row["data"])), &data)
-	st := State{ID: row["id"].(int64), Namespace: anyToString(row["namespace"]), Handle: anyToString(row["handle"]), Template: anyToString(data["template"]), Errors: map[string]string{}}
+	st := State{ID: web.Int64(row["id"]), Namespace: anyToString(row["namespace"]), Handle: anyToString(row["handle"]), Template: anyToString(data["template"]), Errors: map[string]string{}}
 	st.FieldsCollapsedByDefault, _ = data["fields_collapsed_by_default"].(bool)
 	if raw, _ := json.Marshal(data["tabs"]); len(raw) > 0 {
 		json.Unmarshal(raw, &st.Tabs)
@@ -324,7 +324,7 @@ func loadFieldset(a *web.App, id string) (State, bool) {
 	row := rows[0]
 	var data map[string]any
 	json.Unmarshal([]byte(anyToString(row["data"])), &data)
-	st := State{ID: row["id"].(int64), Handle: anyToString(row["handle"]), Tabs: fieldsetTabs, Errors: map[string]string{}}
+	st := State{ID: web.Int64(row["id"]), Handle: anyToString(row["handle"]), Tabs: fieldsetTabs, Errors: map[string]string{}}
 	st.FieldsCollapsedByDefault, _ = data["fields_collapsed_by_default"].(bool)
 	raw, _ := data["fields"].([]any)
 	st.Fields = FromStorage(raw)
