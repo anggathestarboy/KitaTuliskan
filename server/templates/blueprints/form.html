@@ -60,7 +60,7 @@
             </template>
 
             {{/* field tanpa section */}}
-            <div class="space-y-3" @dragover.prevent @drop.prevent="dropTop(null, tab.handle, '')">
+            <div class="min-h-6 space-y-3" @dragover.prevent="hoverTop(null, tab.handle, '')" @drop.prevent="endDrag()">
               <template x-for="f0 in groupFields(tab.handle, '')" :key="f0._uid">
                 {{template "field-editor" (dict "Depth" 0 "F" "f0" "S" "fields" "P" "('fields.'+fields.indexOf(f0))" "Top" true "TabX" "tab.handle" "SecX" "''")}}
               </template>
@@ -70,7 +70,7 @@
             {{/* sections */}}
             <div class="space-y-3">
               <template x-for="(sec, si) in tab.sections" :key="si">
-                <div class="mt-3 space-y-3 rounded-md border border-dashed border-zinc-300 p-3 dark:border-zinc-600" :draggable="dragSec && dragSec.t === ti && dragSec.s === si" @dragstart.stop="$event.dataTransfer.setData('text/plain', 'section')" @dragend="dragSec=null" @dragover.prevent @drop.prevent.stop="dragSec ? dropSection(ti, si) : dropTop(null, tab.handle, sec.handle)">
+                <div class="mt-3 space-y-3 rounded-md border border-dashed border-zinc-300 p-3 dark:border-zinc-600" :draggable="dragSec && dragSec.t === ti && dragSec.s === si" @dragstart.stop="$event.dataTransfer.setData('text/plain', 'section')" @dragend="dragSec=null" @dragover.prevent="dragSec || !sec.handle || hoverTop(null, tab.handle, sec.handle)" @drop.prevent.stop="dragSec ? dropSection(ti, si) : endDrag()">
                   <template x-if="isEditingSection(ti, si)">
                     <div>
                       <div class="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -101,11 +101,11 @@
                   </template>
 
                   <div class="space-y-3">
-                    <template x-for="f0 in groupFields(tab.handle, sec.handle)" :key="f0._uid">
+                    <template x-for="f0 in sectionFields(tab.handle, sec)" :key="f0._uid">
                       {{template "field-editor" (dict "Depth" 0 "F" "f0" "S" "fields" "P" "('fields.'+fields.indexOf(f0))" "Top" true "TabX" "tab.handle" "SecX" "sec.handle")}}
                     </template>
                   </div>
-                  <p x-show="!groupFields(tab.handle, sec.handle).length" class="text-sm text-zinc-500">No fields in this section yet.</p>
+                  <p x-show="!sectionFields(tab.handle, sec).length" class="text-sm text-zinc-500">No fields in this section yet.</p>
                 </div>
               </template>
             </div>
