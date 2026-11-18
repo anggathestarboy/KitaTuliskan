@@ -1,0 +1,4 @@
+{{template "app" .}}
+{{define "title"}}{{if .ID}}Edit term{{else}}New term{{end}}{{end}}
+{{define "content"}}<taxonomies-term data-cp="{{.CP}}" data-handle="{{.Handle}}" data-id="{{.ID}}" data-site="{{.Site}}"></taxonomies-term>
+{{vite "resources/ts/taxonomies/main.tsx"}}{{end}}
