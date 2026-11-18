@@ -55,8 +55,12 @@ export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation'
     : api.content(handle, site)
   ).then((d) => {
     setCd(d); setData(withUids(d.blueprint.fields, d.data)); setErrors({});
+<<<<<<< HEAD
     if (d.term) { setTitle(d.term.title); setSlug(d.term.slug); }
     if (!term && d.sites.length > 1) history.replaceState(history.state, '', `?site=${encodeURIComponent(d.activeSite)}`);
+=======
+    if (d.sites.length > 1) history.replaceState(history.state, '', `?site=${encodeURIComponent(d.activeSite)}`);
+>>>>>>> 6d2665bcbc8ffb30c423f030f453ccc75528e548
   }).catch((e) => setLoadError(e.message));
   useEffect(() => { load(new URLSearchParams(location.search).get('site') ?? ''); }, [api, handle]);
   const back = term ? `${cp}/${scope}/${handle}` : `${cp}/${scope}`;
