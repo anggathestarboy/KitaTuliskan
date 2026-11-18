@@ -728,32 +728,6 @@ func RegisterContent(mux *http.ServeMux, a *web.App, prefix string, src Source) 
 		}
 		return
 	}
-	labelled := func(q string) []map[string]string { // id, group, site, slug, data → {id, group, site, label}
-		out := []map[string]string{}
-		rows, err := a.DB.Query(q)
-		if err != nil {
-			return out
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var id, group, site string
-			var slug sql.NullString
-			var raw []byte
-			rows.Scan(&id, &group, &site, &slug, &raw)
-			var d struct{ Title string }
-			json.Unmarshal(raw, &d)
-			label := d.Title
-			if label == "" {
-				label = slug.String
-			}
-			if label == "" {
-				label = id
-			}
-			out = append(out, map[string]string{"id": id, "group": group, "site": site, "label": label})
-		}
-		return out
-	}
-
 	a.Admin(mux, "GET "+prefix+"/api/content/{handle}", func(w http.ResponseWriter, r *http.Request) {
 		handle, title, b, err := resolve(r, false)
 		if err != nil {
@@ -762,25 +736,14 @@ func RegisterContent(mux *http.ServeMux, a *web.App, prefix string, src Source) 
 		}
 		ss := src.Sites(handle)
 		active, origin, isOrigin := resolveSite(ss, r.URL.Query().Get("site"))
-		var bardContainer string // container gambar editor Bard: yang pertama menurut handle
-		a.DB.QueryRow(`SELECT handle FROM asset_containers ORDER BY handle LIMIT 1`).Scan(&bardContainer)
-		authors := []map[string]string{}
-		if rows, e := a.DB.Query(`SELECT id,name FROM users WHERE banned_at IS NULL ORDER BY name`); e == nil {
-			for rows.Next() {
-				var id, name string
-				rows.Scan(&id, &name)
-				authors = append(authors, map[string]string{"id": id, "name": name})
-			}
-			rows.Close()
-		}
 		out := map[string]any{
 			"item":      map[string]any{"handle": handle, "title": title},
 			"blueprint": b, "sites": ss, "activeSite": active, "isOrigin": isOrigin,
 			"data":    loadContent(a, src, handle, b.Fields, active, origin),
 			"canEdit": src.CanEdit(web.CurrentUser(r), handle),
-			"entries": labelled(`SELECT id,collection,site,slug,data FROM entries ORDER BY collection, slug`),
-			"terms":   labelled(`SELECT id,taxonomy,site,slug,data FROM taxonomy_terms ORDER BY slug`),
-			"authors": authors, "bardContainer": bardContainer,
+		}
+		for k, v := range Lookups(a) {
+			out[k] = v
 		}
 		if src.Extra != nil {
 			for k, v := range src.Extra(handle) {
@@ -826,4 +789,70 @@ func RegisterContent(mux *http.ServeMux, a *web.App, prefix string, src Source) 
 		}
 		reply(w, nil, err)
 	})
+}
+
+// labelled: id, group, site, slug, data → {id, group, site, label}.
+func labelled(a *web.App, q string) []map[string]string {
+	out := []map[string]string{}
+	rows, err := a.DB.Query(q)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, group, site string
+		var slug sql.NullString
+		var raw []byte
+		rows.Scan(&id, &group, &site, &slug, &raw)
+		var d struct{ Title string }
+		json.Unmarshal(raw, &d)
+		label := d.Title
+		if label == "" {
+			label = slug.String
+		}
+		if label == "" {
+			label = id
+		}
+		out = append(out, map[string]string{"id": id, "group": group, "site": site, "label": label})
+	}
+	return out
+}
+
+// Lookups = data pendukung field link/taxonomy/author/bard di form blueprint (dipakai Navigation, Globals, Taxonomies).
+func Lookups(a *web.App) map[string]any {
+	var bardContainer string // container gambar editor Bard: yang pertama menurut handle
+	a.DB.QueryRow(`SELECT handle FROM asset_containers ORDER BY handle LIMIT 1`).Scan(&bardContainer)
+	authors := []map[string]string{}
+	if rows, e := a.DB.Query(`SELECT id,name FROM users WHERE banned_at IS NULL ORDER BY name`); e == nil {
+		for rows.Next() {
+			var id, name string
+			rows.Scan(&id, &name)
+			authors = append(authors, map[string]string{"id": id, "name": name})
+		}
+		rows.Close()
+	}
+	return map[string]any{
+		"entries": labelled(a, `SELECT id,collection,site,slug,data FROM entries ORDER BY collection, slug`),
+		"terms":   labelled(a, `SELECT id,taxonomy,site,slug,data FROM taxonomy_terms ORDER BY slug`),
+		"authors": authors, "bardContainer": bardContainer,
+	}
+}
+
+// Fungsi mesin form yang dipakai modul lain (Taxonomies: satu baris per bahasa, bukan satu objek per item).
+var (
+	Fill           = fill
+	LocalizeLinks  = localizeLinks
+	NonLocalizable = nonLocalizable
+	Same           = eq
+	ResolveSite    = resolveSite
+)
+
+// Validate = fieldRulesFor untuk $vals terhadap $fields di bahasa $site; mengembalikan nilai bersih atau error per-field.
+func Validate(a *web.App, site string, fields []map[string]any, vals map[string]any) (map[string]any, error) {
+	c := &chk{a: a, site: site, errs: map[string]string{}}
+	out := c.check(fields, vals, "")
+	if len(c.errs) > 0 {
+		return nil, fieldErrs{msg: c.first, all: c.errs}
+	}
+	return out, nil
 }

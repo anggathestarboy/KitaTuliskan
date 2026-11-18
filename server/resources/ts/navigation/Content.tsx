@@ -4,9 +4,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Asset } from '../media/api';
 import { useToasts } from '../shared/flux';
-import { Button, Toasts, cn } from '../shared/ui';
+import { Button, Input, Toasts, cn } from '../shared/ui';
 import { AssetPicker, type PickerState } from './AssetPicker';
-import { ApiError, type ContentData, type Field, client, visit } from './api';
+import { ApiError, type ContentData, type Field, client, slug as slugify, visit } from './api';
 import { type Bag, type Env, FieldView, Locked, type Path, uid, visible } from './Fields';
 
 const put = (d: unknown, path: Path, v: unknown): unknown => {
@@ -34,8 +34,9 @@ function assetIds(fields: Field[], data: Bag, out: number[] = []): number[] {
   return out;
 }
 
-// scope = awalan API/URL ("navigations" | "globals"); noun = nama item di toast.
-export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation' }: { cp: string; handle: string; scope?: string; noun?: string }) {
+// scope = awalan API/URL ("navigations" | "globals" | "taxonomies"); noun = nama item di toast.
+// term = mode TermForm: satu baris per bahasa (bukan satu objek per item) + judul, slug, dan pindah bahasa lewat URL term saudara.
+export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation', term }: { cp: string; handle: string; scope?: string; noun?: string; term?: { id: number; site: string } }) {
   const api = useMemo(() => client(cp, scope), [cp, scope]);
   const { toasts, toast } = useToasts();
   const [cd, setCd] = useState<ContentData | null>(null);
@@ -46,12 +47,19 @@ export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation'
   const [picker, setPicker] = useState<PickerState | null>(null);
   const [loadError, setLoadError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState('');
+  const [slug, setSlug] = useState('');
 
-  const load = (site: string) => api.content(handle, site).then((d) => {
+  const load = (site: string) => (term
+    ? api.term(handle, new URLSearchParams({ id: String(term.id), site: term.site, origin: new URLSearchParams(location.search).get('origin') ?? '' }))
+    : api.content(handle, site)
+  ).then((d) => {
     setCd(d); setData(withUids(d.blueprint.fields, d.data)); setErrors({});
-    if (d.sites.length > 1) history.replaceState(null, '', `?site=${encodeURIComponent(d.activeSite)}`);
+    if (d.term) { setTitle(d.term.title); setSlug(d.term.slug); }
+    if (!term && d.sites.length > 1) history.replaceState(null, '', `?site=${encodeURIComponent(d.activeSite)}`);
   }).catch((e) => setLoadError(e.message));
   useEffect(() => { load(new URLSearchParams(location.search).get('site') ?? ''); }, [api, handle]);
+  const back = term ? `${cp}/${scope}/${handle}` : `${cp}/${scope}`;
 
   // Asset yang dipilih perlu info (thumbnail); ambil yang belum ada di cache.
   const missing = useMemo(() => (cd ? [...new Set(assetIds(cd.blueprint.fields, data))].filter((id) => !assets[id]) : []), [cd, data, assets]);
@@ -64,9 +72,15 @@ export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation'
     if (!cd?.canEdit || saving) return;
     setSaving(true);
     try {
+      if (term) {
+        const r = await api.saveTerm(handle, { id: term.id, site: cd.activeSite, origin: cd.term!.origin, title, slug, data: strip(data) });
+        // pesan "Term saved." dikirim server sebagai flash; tujuan menurut "Action after save" taxonomy.
+        visit(r.saveAction === 'editing' ? `${back}/terms/${r.id}` : r.saveAction === 'create_another' ? `${back}/terms/create/${r.site}` : back);
+        return;
+      }
       await api.saveContent(handle, cd.activeSite, strip(data));
       setErrors({});
-      if (cd.saveAction === 'listing') { visit(`${cp}/${scope}`); return; } // pesan "saved" dikirim server sebagai flash
+      if (cd.saveAction === 'listing') { visit(back); return; } // pesan "saved" dikirim server sebagai flash
       toast(`${noun} saved.`);
     } catch (e) {
       if (e instanceof ApiError) setErrors(e.errors);
@@ -126,7 +140,7 @@ export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation'
     <section key={cd.activeSite} className="max-w-8xl w-full space-y-6">
       <div className="flex items-center gap-3 rounded-xl border border-gray-200 px-3.5 py-2 dark:border-zinc-500/80">
         <div className="h-6 w-2.5 rounded-full bg-sky-500" />
-        <h1 className="text-2xl font-medium text-zinc-800 dark:text-white">{cd.item.title}</h1>
+        <h1 className="text-2xl font-medium text-zinc-800 dark:text-white">{term ? (term.id ? 'Edit term' : 'New term') : cd.item.title}</h1>
       </div>
 
       <form className="flex flex-col items-start gap-7 md:flex-row" onSubmit={(e) => { e.preventDefault(); save(); }}>
@@ -153,7 +167,7 @@ export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation'
         <div className="h-max w-full space-y-6 rounded-xl border border-zinc-200 p-4 lg:w-[40%] xl:w-[30%] dark:border-zinc-600">
           <div className="mb-6 flex justify-end gap-2 dark:border-zinc-700">
             {cd.canEdit && <Button variant="primary" type="submit" className="w-full">Save</Button>}
-            <Button variant="filled" onClick={() => visit(`${cp}/${scope}`)}>Cancel</Button>
+            <Button variant="filled" onClick={() => visit(back)}>Cancel</Button>
           </div>
 
           {cd.sites.length > 1 && (
@@ -161,8 +175,17 @@ export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation'
               <div className="flex flex-col gap-1 dark:border-zinc-700">
                 {cd.sites.map((s) => s.handle === cd.activeSite
                   ? <Button key={s.handle} variant="primary" disabled>{s.name}</Button>
-                  : <Button key={s.handle} variant="filled" onClick={() => load(s.handle)}>{s.name}</Button>)}
+                  : <Button key={s.handle} variant="filled" onClick={() => (s.href ? visit(s.href) : load(s.handle))}>{s.name}</Button>)}
               </div>
+            </div>
+          )}
+
+          {term && <Input small label="Title" required maxLength={300} placeholder="Term title" value={title} onChange={(e) => setTitle(e.target.value)} />}
+
+          {term && (
+            <div className="flex items-end gap-2">
+              <div className="min-w-0 flex-1"><Input small label="Slug" required placeholder="my-term-slug" value={slug} onChange={(e) => setSlug(e.target.value)} /></div>
+              <Button icon="arrow-path" title="Regenerate from title" aria-label="Regenerate from title" onClick={() => setSlug(slugify(title))} />
             </div>
           )}
 

@@ -18,7 +18,7 @@ export interface Field {
 export interface Blueprint { handle: string; tabs: { handle: string; display: string; sections?: { handle: string; display: string }[] }[]; fields: Field[] }
 export interface Labelled { id: string; group: string; site: string; label: string }
 export interface ContentData {
-  item: { handle: string; title: string }; blueprint: Blueprint; sites: { handle: string; name: string }[];
+  item: { handle: string; title: string }; blueprint: Blueprint; sites: { handle: string; name: string; href?: string }[]; term?: { id: number; title: string; slug: string; origin: number };
   activeSite: string; isOrigin: boolean; data: Record<string, unknown>; canEdit: boolean;
   saveAction?: string; bardContainer: string; entries: Labelled[]; terms: Labelled[]; authors: { id: string; name: string }[];
 }
@@ -45,6 +45,8 @@ export const client = (cp: string, scope = 'navigations') => {
     saveTree: (handle: string, tree: Item[]) => call(`${base}/tree/${encodeURIComponent(handle)}`, { tree }),
     content: (handle: string, s = '') => call<ContentData>(`${base}/content/${encodeURIComponent(handle)}${site(s)}`),
     saveContent: (handle: string, s: string, data: unknown) => call(`${base}/content/${encodeURIComponent(handle)}${site(s)}`, { data }),
+    term: (handle: string, q: URLSearchParams) => call<ContentData>(`${base}/term/${encodeURIComponent(handle)}?${q}`),
+    saveTerm: (handle: string, body: unknown) => call<{ id: number; site: string; saveAction: string }>(`${base}/term/${encodeURIComponent(handle)}`, body),
   };
 };
 

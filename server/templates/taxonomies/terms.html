@@ -1,0 +1,4 @@
+{{template "app" .}}
+{{define "title"}}{{.TaxTitle}} terms{{end}}
+{{define "content"}}<taxonomies-terms data-cp="{{.CP}}" data-handle="{{.Handle}}"></taxonomies-terms>
+{{vite "resources/ts/taxonomies/main.tsx"}}{{end}}
