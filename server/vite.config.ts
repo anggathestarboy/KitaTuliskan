@@ -6,6 +6,6 @@ export default defineConfig({
   plugins: [tailwindcss()],
   esbuild: { jsx: 'automatic' }, // React tanpa plugin: tidak perlu preamble HMR di template Go (dev = full reload)
   base: '/static/build/',
-  build: { outDir: 'static/build', manifest: true, emptyOutDir: true, rollupOptions: { input: ['resources/css/app.css', 'resources/ts/app.ts', 'resources/ts/media/main.tsx', 'resources/ts/navigation/main.tsx'] } },
+  build: { outDir: 'static/build', manifest: true, emptyOutDir: true, rollupOptions: { input: ['resources/css/app.css', 'resources/ts/app.ts', 'resources/ts/media/main.tsx', 'resources/ts/navigation/main.tsx', 'resources/ts/globals/main.tsx'] } },
   server: { port: 5173, strictPort: true, origin: 'http://localhost:5173', cors: true },
 });

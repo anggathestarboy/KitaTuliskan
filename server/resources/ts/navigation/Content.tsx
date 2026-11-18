@@ -34,8 +34,9 @@ function assetIds(fields: Field[], data: Bag, out: number[] = []): number[] {
   return out;
 }
 
-export function Content({ cp, handle }: { cp: string; handle: string }) {
-  const api = useMemo(() => client(cp), [cp]);
+// scope = awalan API/URL ("navigations" | "globals"); noun = nama item di toast.
+export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation' }: { cp: string; handle: string; scope?: string; noun?: string }) {
+  const api = useMemo(() => client(cp, scope), [cp, scope]);
   const { toasts, toast } = useToasts();
   const [cd, setCd] = useState<ContentData | null>(null);
   const [data, setData] = useState<Bag>({});
@@ -64,7 +65,9 @@ export function Content({ cp, handle }: { cp: string; handle: string }) {
     setSaving(true);
     try {
       await api.saveContent(handle, cd.activeSite, strip(data));
-      setErrors({}); toast('Navigation saved.');
+      setErrors({});
+      if (cd.saveAction === 'listing') { visit(`${cp}/${scope}`); return; } // pesan "saved" dikirim server sebagai flash
+      toast(`${noun} saved.`);
     } catch (e) {
       if (e instanceof ApiError) setErrors(e.errors);
       toast(e instanceof Error ? e.message : String(e), true);
@@ -123,7 +126,7 @@ export function Content({ cp, handle }: { cp: string; handle: string }) {
     <section key={cd.activeSite} className="max-w-8xl w-full space-y-6">
       <div className="flex items-center gap-3 rounded-xl border border-gray-200 px-3.5 py-2 dark:border-zinc-500/80">
         <div className="h-6 w-2.5 rounded-full bg-sky-500" />
-        <h1 className="text-2xl font-medium text-zinc-800 dark:text-white">{cd.navigation.title}</h1>
+        <h1 className="text-2xl font-medium text-zinc-800 dark:text-white">{cd.item.title}</h1>
       </div>
 
       <form className="flex flex-col items-start gap-7 md:flex-row" onSubmit={(e) => { e.preventDefault(); save(); }}>
@@ -137,14 +140,20 @@ export function Content({ cp, handle }: { cp: string; handle: string }) {
             </div>
           )}
           {ungrouped.map(one)}
-          {tabFields.length === 0 && <p className="text-sm text-zinc-500 dark:text-white/70">No fields in this tab.</p>}
+          {blueprint.fields.length === 0 && (
+            <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-600">
+              <p className="text-sm text-zinc-500 dark:text-white/70">This blueprint has no fields yet.</p>
+              <div className="mt-3"><Button onClick={() => visit(`${cp}/blueprints`)}>Add fields in Blueprints</Button></div>
+            </div>
+          )}
+          {blueprint.fields.length > 0 && tabFields.length === 0 && <p className="text-sm text-zinc-500 dark:text-white/70">No fields in this tab.</p>}
           {grouped(tabFields, sections)}
         </div>
 
         <div className="h-max w-full space-y-6 rounded-xl border border-zinc-200 p-4 lg:w-[40%] xl:w-[30%] dark:border-zinc-600">
           <div className="mb-6 flex justify-end gap-2 dark:border-zinc-700">
             {cd.canEdit && <Button variant="primary" type="submit" className="w-full">Save</Button>}
-            <Button variant="filled" onClick={() => visit(`${cp}/navigations`)}>Cancel</Button>
+            <Button variant="filled" onClick={() => visit(`${cp}/${scope}`)}>Cancel</Button>
           </div>
 
           {cd.sites.length > 1 && (

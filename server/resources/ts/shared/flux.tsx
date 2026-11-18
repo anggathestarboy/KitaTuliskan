@@ -9,15 +9,29 @@ export const Badge = ({ children }: { children: ReactNode }) => (
 );
 
 // flux:checkbox: kotak 1.125rem, centang pakai warna accent.
-export function Checkbox({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void }) {
+export function Checkbox({ label, description, checked, onChange, disabled }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 text-sm">
-      <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    <label className={cn('flex items-start gap-3 text-sm', disabled ? 'cursor-default opacity-50' : 'cursor-pointer')}>
+      <input type="checkbox" className="peer sr-only" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <span className={cn('mt-px flex size-[1.125rem] shrink-0 items-center justify-center rounded-[.3rem] border shadow-xs peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-zinc-400',
         checked ? 'border-black/10 bg-[var(--color-accent)] text-[var(--color-accent-foreground)] dark:border-transparent' : 'border-zinc-300 bg-white dark:border-white/10 dark:bg-white/10')}>
         {checked && <svg viewBox="0 0 16 16" fill="currentColor" className="size-4"><path fillRule="evenodd" clipRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" /></svg>}
       </span>
       <span><span className="font-medium text-zinc-800 dark:text-white">{label}</span>{description && <span className="mt-1 block text-sm text-zinc-500 dark:text-white/60">{description}</span>}</span>
+    </label>
+  );
+}
+
+// flux:radio
+export function Radio({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 text-sm">
+      <input type="radio" className="peer sr-only" checked={checked} onChange={onChange} />
+      <span className={cn('flex size-[1.125rem] shrink-0 items-center justify-center rounded-full border shadow-xs peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-zinc-400',
+        checked ? 'border-black/10 bg-[var(--color-accent)] dark:border-transparent' : 'border-zinc-300 bg-white dark:border-white/10 dark:bg-white/10')}>
+        {checked && <span className="size-1.5 rounded-full bg-[var(--color-accent-foreground)]" />}
+      </span>
+      <span className="font-medium text-zinc-800 dark:text-white">{label}</span>
     </label>
   );
 }

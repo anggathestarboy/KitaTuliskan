@@ -1,0 +1,4 @@
+{{template "app" .}}
+{{define "title"}}{{.SetTitle}}{{end}}
+{{define "content"}}<globals-editor data-cp="{{.CP}}" data-handle="{{.Handle}}"></globals-editor>
+{{vite "resources/ts/globals/main.tsx"}}{{end}}
