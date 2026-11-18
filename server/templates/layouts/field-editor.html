@@ -16,8 +16,8 @@
 
 {{/* field-editor: dict Depth F(nama var Alpine field) S(ekspresi array sibling) P(ekspresi prefix error) Top(bool) TabX SecX(ekspresi tab/section grup, hanya Top) */}}
 {{define "field-editor"}}{{$f := .F}}{{$s := .S}}{{$p := .P}}{{$d := .Depth}}
-<div :draggable="armed==={{$f}}._uid" @dragstart.stop="dragStart($event, {{$s}}, {{$f}})" @dragend="armed=null; drag=null; dragSec=null" @dragover.prevent @drop.prevent.stop="{{if .Top}}dropTop({{$f}}, {{.TabX}}, {{.SecX}}){{else}}dropSub({{$s}}, {{$f}}){{end}}"
-  class="rounded-lg border border-gray-200 bg-gray-100 px-1.5 py-1 dark:border-zinc-600 dark:bg-zinc-800">
+<div :draggable="armed==={{$f}}._uid" @dragstart.stop="dragStart($event, {{$s}}, {{$f}})" @dragend="endDrag()" @dragover.prevent.stop="{{if .Top}}hoverTop({{$f}}, {{.TabX}}, {{.SecX}}, $event){{else}}hoverSub({{$s}}, {{$f}}, $event){{end}}" @drop.prevent.stop="endDrag()"
+  :class="drag && drag.uid==={{$f}}._uid ? 'opacity-40' : ''" class="rounded-lg border border-gray-200 bg-gray-100 px-1.5 py-1 transition-opacity dark:border-zinc-600 dark:bg-zinc-800">
   <div class="flex w-full items-center justify-between gap-1 rounded-lg">
     <span @mousedown="armed={{$f}}._uid" @mouseup="armed=null" class="flex h-full cursor-grab items-center px-1 text-zinc-400 hover:text-zinc-600 active:cursor-grabbing dark:hover:text-zinc-300" title="Drag to reorder">{{template "icon-grip"}}</span>
     <p class="flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-x-1.5 self-center break-words rounded-md px-3 py-1.5 text-sm font-medium hover:bg-black/5" @click="{{$f}}._c = !{{$f}}._c">
@@ -156,7 +156,7 @@
       <div class="mt-3 space-y-2 rounded-md border border-dashed border-zinc-300 p-3 dark:border-zinc-600">
         <div class="flex items-center justify-between"><p class="text-xs font-medium text-zinc-500">Replicator fields</p>{{template "button" (dict "Label" "Add field" "Size" "sm" "Attrs" (safe (print `@click="addSub(` $f `)"`)))}}</div>
         {{template "fe-err" (print $p "+'.replicator_fields'")}}
-        <div class="space-y-2" @dragover.prevent @drop.prevent="dropSub({{$f}}.replicator_fields, null)">
+        <div class="min-h-6 space-y-2" @dragover.prevent="hoverSub({{$f}}.replicator_fields, null)" @drop.prevent="endDrag()">
           <template x-for="{{print "f" (inc $d)}} in {{$f}}.replicator_fields" :key="{{print "f" (inc $d)}}._uid">
             {{template "field-editor" (dict "Depth" (inc $d) "F" (print "f" (inc $d)) "S" (print $f ".replicator_fields") "P" (print "(" $p "+'.replicator_fields.'+" $f ".replicator_fields.indexOf(f" (inc $d) "))") "Top" false)}}
           </template>
@@ -215,26 +215,34 @@ window.fieldBuilder = function (st, lk, ed, extra) {
     slug(s) { return (s || '').toLowerCase().replace(/[^a-z\s_]/g, '').trim().replace(/\s+/g, '_').replace(/_+/g, '_'); },
     // ---- drag & drop (pengganti wire:sort) ----
     dragStart(e, list, f) { this.drag = {list, uid: f._uid}; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', f._uid); }, // setData wajib agar Firefox memulai drag
-    dropSub(list, target) {
-      const d = this.drag; this.drag = null; this.armed = null;
-      if (!d || d.list !== list) return;
+    endDrag() { this.drag = null; this.armed = null; this.dragSec = null; },
+    // Reorder terjadi saat dragover (live, seperti Sortable), bukan saat drop: target = item yang dilewati, null = area kosong/akhir list.
+    // pastMid: hanya tukar posisi setelah pointer melewati tengah target searah gerak, supaya tidak bolak-balik saat tinggi item berbeda.
+    pastMid(e, from, to) { if (!e) return true; const r = e.currentTarget.getBoundingClientRect(); const mid = r.top + r.height / 2; return to > from ? e.clientY > mid : e.clientY < mid; },
+    hoverSub(list, target, e) {
+      const d = this.drag; if (!d || d.list !== list) return;
       const from = list.findIndex(x => x._uid === d.uid); if (from < 0) return;
-      const moved = list.splice(from, 1)[0];
-      const pos = target ? list.indexOf(target) : list.length;
-      list.splice(pos, 0, moved);
+      const to = target ? list.indexOf(target) : list.length - 1;
+      if (to === from || to < 0 || (target && !this.pastMid(e, from, to))) return;
+      list.splice(to, 0, list.splice(from, 1)[0]);
     },
-    // = reorderTopLevelFields(): slot absolut grup tetap, hanya nilainya yang berpindah; drop ke grup lain memindahkan tab/section.
-    dropTop(target, tab, section) {
-      const d = this.drag; this.drag = null; this.armed = null;
-      if (!d || d.list !== this.fields) return;
+    // = reorderTopLevelFields(): slot absolut grup tetap, hanya nilainya yang berpindah; hover ke grup lain memindahkan tab/section.
+    hoverTop(target, tab, section, e) {
+      const d = this.drag; if (!d || d.list !== this.fields) return;
       const moved = this.fields.find(x => x._uid === d.uid); if (!moved || moved === target) return;
+      const sameGroup = (moved.tab || 'main') === tab && (moved.section || '') === section;
+      if (!target && sameGroup) return; // hover area kosong grup sendiri: tidak ada yang berubah
       moved.tab = tab; moved.section = section;
       const idxs = this.fields.map((f, i) => i).filter(i => (this.fields[i].tab || 'main') === tab && (this.fields[i].section || '') === section);
       const vals = idxs.map(i => this.fields[i]);
-      vals.splice(vals.indexOf(moved), 1);
-      vals.splice(target ? vals.indexOf(target) : vals.length, 0, moved);
+      const from = vals.indexOf(moved);
+      const to = target ? vals.indexOf(target) : vals.length - 1;
+      if (from === to || (target && sameGroup && !this.pastMid(e, from, to))) return;
+      vals.splice(to, 0, vals.splice(from, 1)[0]);
       idxs.forEach((abs, k) => this.fields[abs] = vals[k]);
     },
+    // sectionFields = sectionFieldIndexes di blade: section tanpa handle (baru dibuat) belum punya field, jangan tertukar dengan grup "tanpa section".
+    sectionFields(tab, sec) { return sec.handle ? this.groupFields(tab, sec.handle) : []; },
     dropSection(t, s) { const d = this.dragSec; this.dragSec = null; if (!d || d.t !== t) return; const secs = this.tabs[t].sections; const moved = secs.splice(d.s, 1)[0]; secs.splice(s === null ? secs.length : s, 0, moved); this.editingSection = null; },
     // ---- tabs & sections (BlueprintForm) ----
     addTab() { this.tabs.push({handle: '', display: '', sections: []}); this.editingTab = this.tabs.length - 1; this.newTab = this.editingTab; },
