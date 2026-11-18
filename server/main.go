@@ -98,6 +98,10 @@ func main() {
 		activitylog.Register(mux, app)
 	}
 
+	mux.HandleFunc("GET /api/assets", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(media.PublicAssets(app))
+	})
 	// JSON publik untuk Astro (PageController + Blade directives di source diganti fetch saat build).
 	mux.HandleFunc("GET /api/{table}", func(w http.ResponseWriter, r *http.Request) {
 		t := r.PathValue("table")

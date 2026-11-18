@@ -6,7 +6,9 @@
 //   @navigation('header')       → const navigation = await navigation('header', { site })  lalu navigation.navbar_loop
 // Opsi collection/taxonomy sama dengan source: site, where, sort ("field:desc" | array), random, limit, related (hanya collection).
 // shortcut: filter di memori dari /api/{table} (cukup untuk build statis skala kecil), pindah ke query SQL bila data besar.
-// shortcut: link "entry::{id}" dan id asset di data belum di-resolve (source: resolveLinkFields/resolveAssetFields).
+// Field "assets" di-resolve jadi objek (= AssetMeta): data.image.url / .alt / .width / .height / .loading / .title / .mime_type ...
+// max_items 1 → satu objek (data.image.url), selain itu array (data.gallery.map(i => i.url)). Hanya container disk public.
+// shortcut: link "entry::{id}" di data belum di-resolve (source: resolveLinkFields).
 const base = import.meta.env.CMS_URL ?? 'http://localhost:8000';
 type Row = Record<string, any>;
 // SSR: data harus live. Cache hanya 2 detik supaya beberapa pemanggilan dalam satu render tidak mengulang fetch.
@@ -44,9 +46,30 @@ const originSite = async () => (await sites())[0]?.handle;
 export const blueprint = async (handle: string) => (await api('blueprints')).find((b) => b.handle === handle);
 const fieldsOf = async (ns: string) => json((await api('blueprints')).find((b) => b.namespace === ns)?.data).fields ?? [];
 
+// = resolveAssetFields: id asset → objek asset, rekursif ke dalam replicator.
+async function resolveAssets(data: Row, fields: Row[]): Promise<Row> {
+  const assets = (await api('assets')) as Row[];
+  const walk = (d: Row, fs: Row[]): Row => {
+    d = { ...d };
+    for (const f of fs) {
+      if (f.type === 'replicator') d[f.handle] = ([d[f.handle] ?? []].flat() as Row[]).map((row) => walk(row, f.replicator_fields ?? []));
+      else if (f.type === 'assets') {
+        const ids = (Array.isArray(d[f.handle]) ? d[f.handle] : []).map(Number);
+        const found = ids.map((id: number) => assets.find((a) => a.id === id)).filter(Boolean);
+        d[f.handle] = f.max_items == null || f.max_items > 1 ? found : found[0] ?? null;
+      }
+    }
+    return d;
+  };
+  return walk(data, fields);
+}
+
+// data entry siap pakai di template: JSON ter-parse + field assets ter-resolve.
+export const entryData = async (e: Row): Promise<Row> => resolveAssets(json(e.data), json((await blueprint(e.blueprint))?.data).fields ?? []);
+
 // @collection: hanya entry published (/api/entries sudah memfilternya).
 export async function collection(handle: string, o: Options = {}): Promise<Entry[]> {
-  let rows = (await api('entries')).filter((e) => e.collection === handle).map((e) => ({ ...e, data: json(e.data) }));
+  let rows = await Promise.all((await api('entries')).filter((e) => e.collection === handle).map(async (e) => ({ ...e, data: await entryData(e) })));
   if (o.related) {
     const rel = typeof o.related === 'string' ? rows.find((e) => e.id === o.related) : o.related;
     const taxFields = json((await blueprint(rel?.blueprint))?.data).fields?.filter((f: Row) => f.type === 'taxonomy').map((f: Row) => f.handle) ?? [];
@@ -67,9 +90,9 @@ export async function globalSet(handle: string, o: { site?: string } = {}): Prom
   const pick = (l?: string) => rows.find((g) => (g.locale ?? '') === (l ?? ''));
   const first = pick(origin) ?? pick('');
   if (!first) return null;
-  const data = json(first.data), own = site !== origin ? pick(site) : undefined;
-  if (own) for (const f of await fieldsOf(`globals.${handle}`)) if ((f.type === 'replicator' || f.localizable) && json(own.data)[f.handle]) data[f.handle] = json(own.data)[f.handle];
-  return data;
+  const data = json(first.data), own = site !== origin ? pick(site) : undefined, fields = await fieldsOf(`globals.${handle}`);
+  if (own) for (const f of fields) if ((f.type === 'replicator' || f.localizable) && json(own.data)[f.handle]) data[f.handle] = json(own.data)[f.handle];
+  return resolveAssets(data, fields);
 }
 
 // @navigation: mode blueprint → objek nilai field; mode lama → daftar item. locale NULL bila hanya satu site.
@@ -79,8 +102,10 @@ export async function navigation(handle: string, o: { site?: string } = {}): Pro
   const first = await tree(multi ? origin : undefined);
   if (!first) return null;
   const data = json(first.tree), site = o.site ?? origin, own = multi && site !== origin ? await tree(site) : undefined;
-  if (own && !Array.isArray(data)) for (const f of await fieldsOf(`navigations.${handle}`)) if (f.localizable && json(own.tree)[f.handle] !== undefined) data[f.handle] = json(own.tree)[f.handle];
-  return data;
+  if (Array.isArray(data)) return data;
+  const fields = await fieldsOf(`navigations.${handle}`);
+  if (own) for (const f of fields) if (f.localizable && json(own.tree)[f.handle] !== undefined) data[f.handle] = json(own.tree)[f.handle];
+  return resolveAssets(data, fields);
 }
 
 export const formAction = (handle: string) => `${base}/!/forms/${handle}`;

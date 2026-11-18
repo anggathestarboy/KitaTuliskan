@@ -6,7 +6,7 @@ import { collection, globalSet, sites, taxonomy } from '../../../cms';
 const { data, site } = Astro.props;
 const global = await globalSet('site_settings', { site: site?.handle });
 const pages = await collection('pages', { site: site?.handle, sort: 'date:desc', limit: 5 });
-console.log(data.title)
+console.log(data.hero_image)
 ---
 
 
@@ -18,7 +18,9 @@ console.log(data.title)
       <div set:html={data.content} />
 
       {data.hero_text}
-      {data.hero_image}
+      {data.hero_image.url}
+      <!-- <img src={data.hero_image.url} alt=""> -->
+      
 
       {global && <pre>{JSON.stringify(global, null, 2)}</pre>}
       <ul>{(await sites()).map((s) => <li>{s.name} ({s.handle})</li>)}</ul>
