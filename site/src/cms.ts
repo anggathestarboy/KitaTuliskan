@@ -69,7 +69,7 @@ export const entryData = async (e: Row): Promise<Row> => resolveAssets(json(e.da
 
 // @collection: hanya entry published (/api/entries sudah memfilternya).
 export async function collection(handle: string, o: Options = {}): Promise<Entry[]> {
-  let rows = await Promise.all((await api('entries')).filter((e) => e.collection === handle).map(async (e) => ({ ...e, url: '/' + (await entryPath(e)), data: await entryData(e) })));
+  let rows = await Promise.all((await api('entries')).filter((e) => e.collection === handle).map(async (e) => { const data = await entryData(e); return { ...data, ...e, url: '/' + (await entryPath(e)), data }; })); // field data diratakan: e.title (kolom menang bila bentrok), e.data.title tetap ada
   if (o.related) {
     const rel = typeof o.related === 'string' ? rows.find((e) => e.id === o.related) : o.related;
     const taxFields = json((await blueprint(rel?.blueprint))?.data).fields?.filter((f: Row) => f.type === 'taxonomy').map((f: Row) => f.handle) ?? [];
@@ -80,7 +80,7 @@ export async function collection(handle: string, o: Options = {}): Promise<Entry
 }
 
 export async function taxonomy(handle: string, o: Options = {}): Promise<Row[]> {
-  return query((await api('taxonomy_terms')).filter((t) => t.taxonomy === handle).map((t) => ({ ...t, data: json(t.data) })), o);
+  return query((await api('taxonomy_terms')).filter((t) => t.taxonomy === handle).map((t) => { const data = json(t.data); return { ...data, ...t, data }; }), o); // diratakan: t.title / t.news_label, t.data.title tetap ada
 }
 
 // @global: field non-localizable selalu dari site asal; localizable/replicator memakai nilai site sendiri bila terisi.
