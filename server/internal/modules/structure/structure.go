@@ -96,3 +96,20 @@ func Rename(db *sql.DB, from, to, typ string) error {
 	_, err := db.Exec(`UPDATE trees SET handle=? WHERE handle=? AND type=?`, to, from, typ)
 	return err
 }
+
+// LoadItems/SaveItems = TreeService::load/save per locale (Collections menyimpan satu tree per site; hanya id + children dipakai).
+func LoadItems(db *sql.DB, handle, typ, locale string) []Item {
+	var raw sql.NullString
+	where, args := byLocale(locale)
+	db.QueryRow(`SELECT tree FROM trees WHERE handle=? AND type=? AND `+where+` ORDER BY id LIMIT 1`, append([]any{handle, typ}, args...)...).Scan(&raw)
+	var items []Item
+	json.Unmarshal([]byte(raw.String), &items)
+	return items
+}
+
+func SaveItems(db *sql.DB, handle, typ, locale string, items []Item) error {
+	if items == nil {
+		items = []Item{}
+	}
+	return put(db, handle, typ, locale, items)
+}

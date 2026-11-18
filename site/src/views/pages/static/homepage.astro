@@ -1,0 +1,30 @@
+---
+// Template blueprint "pages.static.homepage". Props = view() di PageController: entry, data, site.
+// Directive lama → fungsi cms.ts: @global → globalSet, @sites → sites, @collection → collection, @taxonomy → taxonomy, @navigation → navigation.
+import Site from '../../../layouts/Site.astro';
+import { collection, globalSet, sites, taxonomy } from '../../../cms';
+const { data, site } = Astro.props;
+const global = await globalSet('site_settings', { site: site?.handle });
+const pages = await collection('pages', { site: site?.handle, sort: 'date:desc', limit: 5 });
+console.log(data.title)
+---
+
+
+<Site title={data.heading ?? data.title} site={site}>
+   <main style="max-width:40rem;margin:4rem auto;padding:0 1rem">
+      <h1>{data.title}</h1>
+      {data.about_page}
+      {data.subheading && <p>{data.subheading}</p>}
+      <div set:html={data.content} />
+
+      {data.hero_text}
+      {data.hero_image}
+
+      {global && <pre>{JSON.stringify(global, null, 2)}</pre>}
+      <ul>{(await sites()).map((s) => <li>{s.name} ({s.handle})</li>)}</ul>
+      <!-- <ul>{pages.map((e) => <li>{e.data.heading ?? e.data.title ?? e.slug}</li>)}</ul> -->
+      <!-- <ul>{(await taxonomy('categories')).map((t) => <li>{t.data.title ?? t.slug}</li>)}</ul> -->
+
+      <a href="http://127.0.0.1:8000/admin-panel/login" target="_blank">Login Here</a>
+   </main>
+</Site>

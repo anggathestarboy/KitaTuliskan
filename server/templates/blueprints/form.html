@@ -18,7 +18,7 @@
       {{if .Templates}}
       <div>{{template "fe-label" "Template"}}<select x-model="template" class="{{template "fe-cls"}}"><option value="">No template</option>{{range .Templates}}<option value="{{.}}" {{if eq . $.State.Template}}selected{{end}}>{{.}}</option>{{end}}</select>
         <p class="mt-1 text-xs text-zinc-500">The view used to render entries using this blueprint.</p>{{template "fe-err" "'template'"}}</div>
-      {{else}}<div><p class="text-sm font-medium">Template</p><p class="text-sm text-zinc-500">No templates yet — add an .astro file under site/src/pages first.</p></div>{{end}}
+      {{else}}<div><p class="text-sm font-medium">Template</p><p class="text-sm text-zinc-500">No templates yet — add an .astro file under site/src/views/pages first.</p></div>{{end}}
     </div>
 
     <div class="space-y-3">

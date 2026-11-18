@@ -23,10 +23,10 @@ export function Checkbox({ label, description, checked, onChange, disabled }: { 
 }
 
 // flux:radio
-export function Radio({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
+export function Radio({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: () => void; disabled?: boolean }) {
   return (
-    <label className="flex cursor-pointer items-center gap-3 text-sm">
-      <input type="radio" className="peer sr-only" checked={checked} onChange={onChange} />
+    <label className={cn('flex items-center gap-3 text-sm', disabled ? 'cursor-default opacity-50' : 'cursor-pointer')}>
+      <input type="radio" className="peer sr-only" checked={checked} disabled={disabled} onChange={onChange} />
       <span className={cn('flex size-[1.125rem] shrink-0 items-center justify-center rounded-full border shadow-xs peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-zinc-400',
         checked ? 'border-black/10 bg-[var(--color-accent)] dark:border-transparent' : 'border-zinc-300 bg-white dark:border-white/10 dark:bg-white/10')}>
         {checked && <span className="size-1.5 rounded-full bg-[var(--color-accent-foreground)]" />}

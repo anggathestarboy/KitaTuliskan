@@ -1,0 +1,19 @@
+---
+// = PageController::show: render entry published di path ini; view dari blueprint.data.template ("pages.static.homepage"),
+// props sama seperti view() lama: entry, data, site. Dirender per request, jadi page baru langsung live.
+import { api, blueprint, entryPath, json, sites, type Entry } from '../cms';
+
+const views = import.meta.glob('../views/pages/**/*.astro');
+const path = Astro.params.slug ?? '';
+let found: { View: any; entry: Entry } | undefined;
+for (const e of (await api('entries')) as Entry[]) {
+  if ((await entryPath(e)) !== path) continue;
+  const template = json((await blueprint(e.blueprint))?.data).template as string | undefined;
+  const load = template && views[`../views/${template.replaceAll('.', '/')}.astro`];
+  if (load) { found = { View: ((await load()) as { default: any }).default, entry: e }; break; }
+}
+if (!found) Astro.response.status = 404; // = NotFoundHttpException di PageController
+const site = found && (await sites()).find((s) => s.handle === found!.entry.site);
+---
+
+{found ? <found.View entry={found.entry} data={json(found.entry.data)} site={site} /> : <h1>404 Not Found</h1>}
