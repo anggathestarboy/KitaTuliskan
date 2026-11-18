@@ -1,11 +1,160 @@
 {{template "app" .}}
 {{define "title"}}Site Settings{{end}}
 {{define "content"}}
-<section class="w-full space-y-6">
-{{template "page-header" (dict "Title" "Site Settings" "Action" (safe ``))}}
-{{template "card-open"}}<form method="post" action="{{.CP}}/site-settings" class="max-w-2xl space-y-6 p-4">
-{{template "input" (dict "Label" "robots.txt" "Name" "robots_txt" "Type" "textarea" "Rows" 6 "Value" .RobotsTxt "Description" "Served at /robots.txt")}}
-{{template "input" (dict "Label" "llms.txt" "Name" "llms_txt" "Type" "textarea" "Rows" 6 "Value" .LlmsTxt "Description" "Served at /llms.txt")}}
-{{template "button" (dict "Label" "Save" "Variant" "primary" "Type" "submit")}}</form>{{template "card-close"}}
+{{/* = site-settings-manager.blade.php + partials/schema-block.blade.php. State dikirim utuh sebagai JSON (input hidden "state"); tab aktif disimpan di ?q= seperti #[Url('q')]. */}}
+<script>
+window.siteSettings = function (st, opts, tab) {
+  return {
+    ...st, errors: st.errors || {}, opts, tab,
+    picker: {open: false, block: null, path: '', folders: [], files: [], loading: false},
+    init() { this.$watch('tab', t => history.replaceState(null, '', '?q=' + t)); },
+    payload() { const {errors, picker, opts, tab, ...rest} = this; return JSON.stringify(rest); },
+    tabCls(t) { return this.tab === t ? 'border-zinc-800 font-medium text-zinc-900 dark:border-zinc-100 dark:text-zinc-100' : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'; },
+    toggleAll(list, all) { const h = all.map(x => x.handle); this[list] = this[list].length === h.length ? [] : h; },
+    fillDefaultRobots() { this.robotsTxt = 'User-agent: *\nAllow: /\nSitemap: ' + this.opts.appUrl + '/sitemap.xml'; },
+    fillDefaultLlms() { this.llmsTxt = '# ' + this.opts.appName + '\n\n> A short summary of what this site is about.\n\n## Pages\n\n- [Home](/): The homepage.\n'; },
+    async generate() {
+      const r = await fetch(this.opts.cp + '/site-settings/generate', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({state: this.payload()})});
+      this.llmsTxt = await r.text();
+    },
+    defaultBlock() { return {type: 'Organization', name: '', alternate_name: '', description: '', logo: '', same_as: [], email: '', telephone: '', contact_type: '', address_street: '', address_locality: '', address_region: '', address_postal: '', address_country: '', service_type: '', area_served: ''}; },
+    addBlock() { this.schemaBlocks.push(this.defaultBlock()); },
+    // logo picker = media::asset-picker (versi ringkas: browse folder + pilih satu gambar lewat /media/api/listing)
+    async pickLogo(b, path) {
+      this.picker = {...this.picker, open: true, block: b, path: path || '', loading: true};
+      this.$refs.picker.showModal();
+      const r = await fetch(this.opts.cp + '/media/api/listing?' + new URLSearchParams({container: this.opts.assetContainer, path: this.picker.path}));
+      const d = await r.json();
+      this.picker.folders = d.folders || []; this.picker.files = (d.files || []).filter(f => (f.mime_type || '').startsWith('image/')); this.picker.loading = false;
+    },
+    choose(f) { this.picker.block.logo = f.url; this.picker.open = false; this.$refs.picker.close(); },
+    up() { const p = this.picker.path.split('/'); p.pop(); this.pickLogo(this.picker.block, p.join('/')); },
+  };
+};
+</script>
+<section class="w-full max-w-7xl space-y-6" x-data="siteSettings({{json .State}}, {{json (merge .Opts "cp" .CP)}}, {{json .Tab}})">
+  {{template "page-header" (dict "Title" "Site Settings")}}
+
+  <div class="flex gap-1 border-b border-zinc-200 dark:border-zinc-700">
+    {{range list "robots|robots.txt" "llms|llms.txt" "schema|Schema" "integrations|Integrations"}}{{$k := index (split . "|") 0}}
+    <button type="button" @click="tab='{{$k}}'" :class="tabCls('{{$k}}')" class="cursor-pointer border-b-2 px-3 py-2 text-sm">{{index (split . "|") 1}}</button>{{end}}
+  </div>
+
+  <form method="post" action="{{.CP}}/site-settings" class="space-y-6" @keydown.window.meta.s.prevent="$el.requestSubmit()" @keydown.window.ctrl.s.prevent="$el.requestSubmit()">
+    <input type="hidden" name="state" :value="payload()"><input type="hidden" name="q" :value="tab">
+
+    {{/* ---- robots.txt ---- */}}
+    <div x-show="tab==='robots'" x-cloak class="space-y-2 text-sm">
+      <div class="mb-1 flex items-center justify-between"><label class="font-medium text-zinc-800 dark:text-white">robots.txt</label>{{template "button" (dict "Label" "Fill default" "Size" "sm" "Attrs" (safe `@click="fillDefaultRobots()"`))}}</div>
+      <textarea x-model="robotsTxt" rows="14" placeholder="User-agent: *&#10;Allow: /" class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-xs text-zinc-700 shadow-xs placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-800/10 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"></textarea>
+      {{template "subheading" "Served as-is at /robots.txt."}}
+    </div>
+
+    {{/* ---- llms.txt ---- */}}
+    <div x-show="tab==='llms'" x-cloak class="space-y-6">
+      <div class="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-white/10">
+        <div class="space-y-2 text-sm">
+          <div class="mb-1 flex items-center justify-between"><label class="font-medium text-zinc-800 dark:text-white">Select Collections</label>{{template "button" (dict "Label" "Select / Deselect all" "Size" "sm" "Attrs" (safe `@click="toggleAll('llmsCollections', collections)"`))}}</div>
+          <div class="space-y-2">{{range .Collections}}<label class="flex items-center gap-2"><input type="checkbox" value="{{.handle}}" x-model="llmsCollections" class="size-4 rounded border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700">{{.title}}</label>{{else}}<p class="text-zinc-500">No collections yet.</p>{{end}}</div>
+          {{template "subheading" "Published entries from these collections will be listed in llms.txt."}}
+        </div>
+        <div class="space-y-2 text-sm">
+          <div class="mb-1 flex items-center justify-between"><label class="font-medium text-zinc-800 dark:text-white">Select Taxonomies</label>{{template "button" (dict "Label" "Select / Deselect all" "Size" "sm" "Attrs" (safe `@click="toggleAll('llmsTaxonomies', taxonomies)"`))}}</div>
+          <div class="space-y-2">{{range .Taxonomies}}<label class="flex items-center gap-2"><input type="checkbox" value="{{.handle}}" x-model="llmsTaxonomies" class="size-4 rounded border-zinc-300 dark:border-zinc-600 dark:bg-zinc-700">{{.title}}</label>{{else}}<p class="text-zinc-500">No taxonomies yet.</p>{{end}}</div>
+          {{template "subheading" "Terms from these taxonomies will be listed in llms.txt."}}
+        </div>
+        {{template "input" (dict "Label" "Entries/terms limit" "Type" "number" "Min" 1 "Description" "Maximum number of links to include for each collection/taxonomy." "Attrs" (safe `x-model="llmsLimit"`))}}{{template "fe-err" "'llmsLimit'"}}
+        {{template "input" (dict "Label" "Additional content" "Type" "textarea" "Rows" 4 "Description" "Extra text appended after the generated lists." "Attrs" (safe `x-model="llmsAdditionalContent"`))}}
+        {{template "button" (dict "Label" "Generate" "Size" "sm" "Variant" "primary" "Attrs" (safe `@click="generate()"`))}}
+      </div>
+      <div class="space-y-2 text-sm">
+        <div class="mb-1 flex items-center justify-between"><label class="font-medium text-zinc-800 dark:text-white">llms.txt</label>{{template "button" (dict "Label" "Fill blank default" "Size" "sm" "Attrs" (safe `@click="fillDefaultLlms()"`))}}</div>
+        <textarea x-model="llmsTxt" rows="14" placeholder="# Site name&#10;&#10;> Summary" class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-xs text-zinc-700 shadow-xs placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-800/10 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"></textarea>
+        {{template "subheading" "This is what actually gets saved and served at /llms.txt — Generate fills it in, but you can still edit it by hand before saving."}}
+      </div>
+    </div>
+
+    {{/* ---- Schema ---- */}}
+    <div x-show="tab==='schema'" x-cloak class="space-y-6">
+      {{template "subheading" "Add as many schema.org blocks as you need — e.g. Organization and WebSite together. Types that need a specific page (Article, BlogPosting, NewsArticle) aren't offered here, since this schema is the same on every page."}}
+      <div class="space-y-4">
+        <template x-for="(b, i) in schemaBlocks" :key="i">
+          <div class="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-white/10">
+            <div class="flex items-center justify-between gap-4">
+              <div class="w-full max-w-xs">{{template "fe-label" "Schema type"}}<select x-model="b.type" class="{{template "fe-cls"}} !h-10"><template x-for="t in opts.schemaTypes" :key="t"><option :value="t" x-text="t" :selected="t===b.type"></option></template></select>{{template "fe-err" "'schemaBlocks.'+i+'.type'"}}</div>
+              {{template "button" (dict "Label" "Remove" "Size" "sm" "Variant" "danger" "Attrs" (safe `@click="schemaBlocks.splice(i,1)"`))}}
+            </div>
+            <div>{{template "fe-label" "Name"}}<input x-model="b.name" placeholder="Acme Inc." class="{{template "fe-cls"}} !h-10">{{template "fe-err" "'schemaBlocks.'+i+'.name'"}}</div>
+            <div x-show="b.type==='Organization'">{{template "fe-label" "Alternate name"}}<input x-model="b.alternate_name" placeholder="Acme" class="{{template "fe-cls"}} !h-10"></div>
+            <div>{{template "fe-label" "Description"}}<textarea x-model="b.description" rows="3" class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 shadow-xs focus:outline-none focus:ring-2 focus:ring-zinc-800/10 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"></textarea>{{template "fe-err" "'schemaBlocks.'+i+'.description'"}}</div>
+
+            <div x-show="['Organization','ContactPage','AboutPage'].includes(b.type)">{{template "fe-label" "Logo / image"}}
+              <div class="flex items-center gap-3">
+                <template x-if="b.logo"><div class="flex items-center gap-3"><img :src="b.logo" class="size-16 rounded border border-zinc-200 object-contain dark:border-white/10" alt="">{{template "button" (dict "Label" "Remove" "Size" "sm" "Variant" "danger" "Attrs" (safe `@click="b.logo=''"`))}}</div></template>
+                <template x-if="!b.logo">{{template "button" (dict "Label" "Choose logo" "Size" "sm" "Attrs" (safe `@click="pickLogo(b, '')" :disabled="!opts.assetContainer"`))}}</template>
+              </div>{{template "fe-err" "'schemaBlocks.'+i+'.logo'"}}
+            </div>
+
+            <template x-if="b.type==='Organization'">
+              <div class="space-y-4">
+                <div>{{template "fe-label" "Social profiles (sameAs)"}}
+                  <div class="space-y-2"><template x-for="(u, j) in b.same_as" :key="j"><div class="flex gap-2"><input x-model="b.same_as[j]" placeholder="https://twitter.com/acme" class="{{template "fe-cls"}} !h-10 flex-1"><button type="button" class="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-800/5 dark:text-zinc-300 dark:hover:bg-white/10" @click="b.same_as.splice(j,1)">{{template "icon-trash"}}</button></div></template></div>
+                  {{template "fe-err" "'schemaBlocks.'+i+'.same_as'"}}
+                  <div class="mt-2">{{template "button" (dict "Label" "Add profile" "Size" "sm" "Attrs" (safe `@click="b.same_as.push('')"`))}}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>{{template "fe-label" "Email"}}<input type="email" x-model="b.email" placeholder="hello@acme.com" class="{{template "fe-cls"}} !h-10">{{template "fe-err" "'schemaBlocks.'+i+'.email'"}}</div>
+                  <div>{{template "fe-label" "Telephone"}}<input x-model="b.telephone" placeholder="+62 812 3456 7890" class="{{template "fe-cls"}} !h-10">{{template "fe-err" "'schemaBlocks.'+i+'.telephone'"}}</div>
+                </div>
+                <div>{{template "fe-label" "Contact type"}}<input x-model="b.contact_type" placeholder="customer service" class="{{template "fe-cls"}} !h-10"></div>
+                <div class="space-y-4 border-t border-zinc-200 pt-4 dark:border-white/10">
+                  {{template "subheading" "Address"}}
+                  <div>{{template "fe-label" "Street address"}}<input x-model="b.address_street" class="{{template "fe-cls"}} !h-10"></div>
+                  <div class="grid grid-cols-2 gap-4"><div>{{template "fe-label" "City"}}<input x-model="b.address_locality" class="{{template "fe-cls"}} !h-10"></div><div>{{template "fe-label" "Region/Province"}}<input x-model="b.address_region" class="{{template "fe-cls"}} !h-10"></div></div>
+                  <div class="grid grid-cols-2 gap-4"><div>{{template "fe-label" "Postal code"}}<input x-model="b.address_postal" class="{{template "fe-cls"}} !h-10">{{template "fe-err" "'schemaBlocks.'+i+'.address_postal'"}}</div><div>{{template "fe-label" "Country"}}<input x-model="b.address_country" placeholder="ID" class="{{template "fe-cls"}} !h-10"></div></div>
+                </div>
+              </div>
+            </template>
+            <template x-if="b.type==='Service'">
+              <div class="space-y-4">
+                <div>{{template "fe-label" "Service type"}}<input x-model="b.service_type" placeholder="Web Design" class="{{template "fe-cls"}} !h-10"></div>
+                <div>{{template "fe-label" "Area served"}}<input x-model="b.area_served" placeholder="Indonesia" class="{{template "fe-cls"}} !h-10"></div>
+              </div>
+            </template>
+          </div>
+        </template>
+        <p x-show="!schemaBlocks.length" class="text-sm text-zinc-500">No schema blocks yet.</p>
+      </div>
+      {{template "button" (dict "Label" "Add schema" "Size" "sm" "Attrs" (safe `@click="addBlock()"`))}}
+    </div>
+
+    {{/* ---- Integrations ---- */}}
+    <div x-show="tab==='integrations'" x-cloak class="space-y-6">
+      <div class="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-white/10">
+        <div>{{template "switch" (dict "Label" "Google Analytics" "Name" "" "Model" "gaEnabled")}}{{template "subheading" "Injects the GA4 tracking snippet into every page when enabled."}}</div>
+        <div x-show="gaEnabled">{{template "input" (dict "Label" "Measurement ID" "Placeholder" "G-XXXXXXXXXX" "Attrs" (safe `x-model="gaMeasurementId"`))}}{{template "fe-err" "'gaMeasurementId'"}}</div>
+      </div>
+      <div class="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-white/10">
+        <div>{{template "switch" (dict "Label" "Google Search Console" "Name" "" "Model" "gscEnabled")}}{{template "subheading" "Injects the site-verification meta tag into every page when enabled."}}</div>
+        <div x-show="gscEnabled">{{template "input" (dict "Label" "Verification code" "Placeholder" "abcdefg1234567" "Description" "The content value from the meta tag Search Console gives you, not the full <meta> tag." "Attrs" (safe `x-model="gscVerificationCode"`))}}{{template "fe-err" "'gscVerificationCode'"}}</div>
+      </div>
+    </div>
+
+    <div class="flex justify-end">{{template "button" (dict "Label" "Save" "Variant" "primary" "Type" "submit")}}</div>
+  </form>
+
+  {{/* logo picker */}}
+  <dialog x-ref="picker" class="m-auto w-full max-w-3xl rounded-xl border border-zinc-200 bg-white p-4 text-zinc-800 shadow-xl backdrop:bg-zinc-900/40 backdrop:backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" @click.self="$el.close()">{{template "modal-x"}}
+    <div class="space-y-4">
+      <div class="flex items-center gap-2"><h2 class="text-lg font-semibold">Choose logo</h2><span class="text-sm text-zinc-500" x-text="'/' + picker.path"></span></div>
+      <p x-show="picker.loading" class="text-sm text-zinc-500">Loading…</p>
+      <div class="flex flex-wrap gap-2">
+        <template x-if="picker.path">{{template "button" (dict "Label" "← Up" "Size" "sm" "Attrs" (safe `@click="up()"`))}}</template>
+        <template x-for="d in picker.folders" :key="d.path || d.name"><button type="button" class="inline-flex h-8 items-center gap-1 rounded-lg border border-zinc-200 px-3 text-sm hover:bg-zinc-50 dark:border-zinc-600 dark:hover:bg-zinc-700" @click="pickLogo(picker.block, d.path || d.name)"><span class="text-zinc-400">{{template "icon-folder"}}</span><span x-text="d.name || d.path"></span></button></template>
+      </div>
+      <div class="grid grid-cols-3 gap-3 sm:grid-cols-5"><template x-for="f in picker.files" :key="f.id"><button type="button" class="aspect-square overflow-hidden rounded-lg border border-zinc-200 hover:ring-2 hover:ring-zinc-800/20 dark:border-zinc-600" :title="f.basename" @click="choose(f)"><img :src="f.url" :alt="f.alt" class="size-full object-cover"></button></template></div>
+      <p x-show="!picker.loading && !picker.files.length && !picker.folders.length" class="text-sm text-zinc-500">No images here.</p>
+    </div>
+  </dialog>
 </section>
 {{end}}
