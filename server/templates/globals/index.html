@@ -1,0 +1,4 @@
+{{template "app" .}}
+{{define "title"}}Globals{{end}}
+{{define "content"}}<globals-manager data-cp="{{.CP}}"></globals-manager>
+{{vite "resources/ts/globals/main.tsx"}}{{end}}

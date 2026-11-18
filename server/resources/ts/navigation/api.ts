@@ -18,24 +18,24 @@ export interface Field {
 export interface Blueprint { handle: string; tabs: { handle: string; display: string; sections?: { handle: string; display: string }[] }[]; fields: Field[] }
 export interface Labelled { id: string; group: string; site: string; label: string }
 export interface ContentData {
-  navigation: { handle: string; title: string }; blueprint: Blueprint; sites: { handle: string; name: string }[];
+  item: { handle: string; title: string }; blueprint: Blueprint; sites: { handle: string; name: string }[];
   activeSite: string; isOrigin: boolean; data: Record<string, unknown>; canEdit: boolean;
-  bardContainer: string; entries: Labelled[]; terms: Labelled[]; authors: { id: string; name: string }[];
+  saveAction?: string; bardContainer: string; entries: Labelled[]; terms: Labelled[]; authors: { id: string; name: string }[];
 }
 
 export class ApiError extends Error {
   constructor(message: string, public errors: Record<string, string> = {}) { super(message); }
 }
 
-async function call<T>(url: string, body?: unknown): Promise<T> {
+export async function call<T>(url: string, body?: unknown): Promise<T> {
   const r = await fetch(url, body === undefined ? undefined : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new ApiError(j.error || 'Something went wrong.', j.errors);
   return j;
 }
 
-export const client = (cp: string) => {
-  const base = `${cp}/navigations/api`;
+export const client = (cp: string, scope = 'navigations') => {
+  const base = `${cp}/${scope}/api`;
   const site = (s: string) => (s ? `?site=${encodeURIComponent(s)}` : '');
   return {
     list: () => call<{ navigations: Nav[]; canCreate: boolean; blueprints: BlueprintOption[] }>(`${base}/list`),
@@ -49,6 +49,6 @@ export const client = (cp: string) => {
 };
 
 // Str::slug($title) untuk tombol "Regenerate from title".
-export const slug = (t: string) => t.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+export const slug = (t: string, sep = '-') => t.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, sep).replace(new RegExp(`^${sep}+|${sep}+$`, 'g'), '');
 
 export const visit = (url: string) => { const t = (window as unknown as { Turbo?: { visit: (u: string) => void } }).Turbo; t ? t.visit(url) : (location.href = url); };

@@ -103,6 +103,15 @@ func reply(w http.ResponseWriter, out any, err error) {
 	json.NewEncoder(w).Encode(out)
 }
 
+// Dipakai ulang modul lain yang menyajikan JSON API sejenis (Globals).
+type APIErr = apiErr
+
+var (
+	Reply        = reply
+	Decode       = decode
+	ErrForbidden = errForbidden
+)
+
 func decode(w http.ResponseWriter, r *http.Request, v any) error {
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<20)).Decode(v); err != nil {
 		return apiErr("Invalid request.")
@@ -151,7 +160,7 @@ func Register(mux *http.ServeMux, a *web.App) {
 			}
 			list = append(list, n)
 		}
-		reply(w, map[string]any{"navigations": list, "canCreate": u.Can("configure navigation"), "blueprints": blueprintOptions(a)}, rows.Err())
+		reply(w, map[string]any{"navigations": list, "canCreate": u.Can("configure navigation"), "blueprints": BlueprintOptions(a)}, rows.Err())
 	})
 
 	// POST save: buat/ubah navigation (judul + handle). Yang terproteksi tidak bisa diubah sama sekali.
@@ -235,12 +244,26 @@ func Register(mux *http.ServeMux, a *web.App) {
 		}
 		created := false
 		if err == nil && create {
-			created, err = createBlueprint(a, handle)
+			created, err = CreateBlueprint(a, "navigations", handle)
 		}
 		reply(w, map[string]any{"ok": true, "blueprintCreated": created}, err)
 	})
 
-	registerContent(mux, a, byHandle)
+	RegisterContent(mux, a, "/navigations", Source{
+		Find: func(h string) (string, *bp, error) {
+			n, err := byHandle(h)
+			return n.Title, blueprintOf(a, n), err
+		},
+		CanView: canView, CanEdit: canEdit,
+		Sites: func(string) []site { // navigation hanya dilokalisasi bila ada >1 site
+			if ss := Sites(a); len(ss) > 1 {
+				return ss
+			}
+			return nil
+		},
+		Load: func(h, loc string) map[string]any { return structure.LoadData(a.DB, h, "navigation", loc) },
+		Save: func(h, loc string, d map[string]any) error { return structure.SaveData(a.DB, h, "navigation", loc, d) },
+	})
 
 	a.Admin(mux, "POST /navigations/api/delete", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ ID int64 }

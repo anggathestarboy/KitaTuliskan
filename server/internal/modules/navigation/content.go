@@ -19,7 +19,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"draftcms-lite/internal/modules/structure"
 	"draftcms-lite/internal/web"
 )
 
@@ -29,13 +28,17 @@ type bp struct {
 	Fields []map[string]any `json:"fields"`
 }
 
-// blueprintOf = Navigation::effectiveBlueprint(): pilihan eksplisit settings.blueprint, kalau kosong blueprint ber-namespace "navigations.{handle}".
-func blueprintOf(a *web.App, n navRow) *bp {
-	var s struct{ Blueprint string }
-	json.Unmarshal(n.settings, &s)
-	q, arg := `SELECT handle,data FROM blueprints WHERE namespace=? ORDER BY id LIMIT 1`, "navigations."+n.Handle
-	if s.Blueprint != "" {
-		q, arg = `SELECT handle,data FROM blueprints WHERE handle=? ORDER BY id LIMIT 1`, s.Blueprint
+// BP / Site = tipe yang dipakai Source; dialiaskan supaya modul lain (Globals) bisa menyebutnya.
+type (
+	BP   = bp
+	Site = site
+)
+
+// BlueprintFor = effectiveBlueprint(): pilihan eksplisit, kalau kosong blueprint ber-namespace "{ns}.{handle}". nil bila tidak ada.
+func BlueprintFor(a *web.App, ns, handle, explicit string) *bp {
+	q, arg := `SELECT handle,data FROM blueprints WHERE namespace=? ORDER BY id LIMIT 1`, ns+"."+handle
+	if explicit != "" {
+		q, arg = `SELECT handle,data FROM blueprints WHERE handle=? ORDER BY id LIMIT 1`, explicit
 	}
 	var b bp
 	var raw []byte
@@ -57,8 +60,14 @@ func blueprintOf(a *web.App, n navRow) *bp {
 	return &b
 }
 
-// blueprintOptions = availableBlueprints(): untuk select Blueprint di modal.
-func blueprintOptions(a *web.App) []map[string]string {
+func blueprintOf(a *web.App, n navRow) *bp {
+	var s struct{ Blueprint string }
+	json.Unmarshal(n.settings, &s)
+	return BlueprintFor(a, "navigations", n.Handle, s.Blueprint)
+}
+
+// BlueprintOptions = availableBlueprints(): untuk select Blueprint di modal.
+func BlueprintOptions(a *web.App) []map[string]string {
 	out := []map[string]string{}
 	rows, err := a.DB.Query(`SELECT namespace,handle FROM blueprints ORDER BY namespace, handle`)
 	if err != nil {
@@ -78,16 +87,16 @@ func blueprintOptions(a *web.App) []map[string]string {
 	return out
 }
 
-// createBlueprint = Blueprint::firstOrCreate: blueprint kosong "navigations.{handle}"; true bila baru dibuat.
-func createBlueprint(a *web.App, handle string) (bool, error) {
+// CreateBlueprint = Blueprint::firstOrCreate: blueprint kosong "{ns}.{handle}" (ns: "navigations" / "globals"); true bila baru dibuat.
+func CreateBlueprint(a *web.App, ns, handle string) (bool, error) {
 	var id int64
-	err := a.DB.QueryRow(`SELECT id FROM blueprints WHERE namespace=? AND handle=?`, "navigations."+handle, handle).Scan(&id)
+	err := a.DB.QueryRow(`SELECT id FROM blueprints WHERE namespace=? AND handle=?`, ns+"."+handle, handle).Scan(&id)
 	if err != sql.ErrNoRows {
 		return false, err
 	}
 	now := web.Now()
 	_, err = a.DB.Exec(`INSERT INTO blueprints(namespace,handle,data,created_at,updated_at) VALUES(?,?,?,?,?)`,
-		"navigations."+handle, handle, `{"tabs":[{"handle":"main","display":"Main","sections":[]}],"fields":[]}`, now, now)
+		ns+"."+handle, handle, `{"tabs":[{"handle":"main","display":"Main","sections":[]}],"fields":[]}`, now, now)
 	return err == nil, err
 }
 
@@ -196,7 +205,8 @@ type site struct {
 	Name   string `json:"name"`
 }
 
-func sites(a *web.App) []site {
+// Sites = semua site menurut urutan; dipakai modul lain untuk daftar "Languages".
+func Sites(a *web.App) []site {
 	out := []site{}
 	rows, err := a.DB.Query("SELECT handle,name FROM sites ORDER BY `order`")
 	if err != nil {
@@ -211,10 +221,10 @@ func sites(a *web.App) []site {
 	return out
 }
 
-// resolveSite: bahasa yang sedang diedit. Hanya bila ada >1 site navigation dilokalisasi (locale = handle site, origin = site teratas);
-// selain itu satu tree tanpa locale yang selalu "origin".
+// resolveSite: bahasa yang sedang diedit. Tanpa site → satu baris tanpa locale yang selalu "origin";
+// selain itu locale = handle site, origin = site teratas.
 func resolveSite(ss []site, req string) (active, origin string, isOrigin bool) {
-	if len(ss) <= 1 {
+	if len(ss) == 0 {
 		return "", "", true
 	}
 	origin, active = ss[0].Handle, ss[0].Handle
@@ -321,12 +331,12 @@ func nonLocalizable(fields []map[string]any) map[string]bool {
 }
 
 // loadContent = loadBlueprintData: baris locale non-origin hanya memuat field yang dioverride; sisanya mengikuti bahasa default.
-func loadContent(a *web.App, handle string, fields []map[string]any, active, origin string) map[string]any {
-	own := structure.LoadData(a.DB, handle, "navigation", active)
+func loadContent(a *web.App, src Source, handle string, fields []map[string]any, active, origin string) map[string]any {
+	own := src.Load(handle, active)
 	if active == origin {
 		return fill(fields, own)
 	}
-	merged := structure.LoadData(a.DB, handle, "navigation", origin)
+	merged := src.Load(handle, origin)
 	skip := nonLocalizable(fields)
 	for k, v := range own {
 		if !skip[k] {
@@ -685,19 +695,35 @@ func (c *chk) check(fields []map[string]any, vals map[string]any, prefix string)
 
 /* ---------- route ---------- */
 
-func registerContent(mux *http.ServeMux, a *web.App, byHandle func(string) (navRow, error)) {
-	// resolve: navigation + blueprint ber-field + izin; dipakai GET dan POST.
-	resolve := func(r *http.Request, write bool) (n navRow, b *bp, err error) {
+// Source = apa yang membedakan satu modul dari yang lain untuk form nilai berbasis blueprint (Navigation, Globals).
+type Source struct {
+	Find             func(handle string) (title string, b *bp, err error) // b == nil: belum ada blueprint
+	CanView, CanEdit func(u *web.User, handle string) bool
+	Sites            func(handle string) []site                 // site yang dipakai item ini; kosong = satu baris tanpa locale
+	Load             func(handle, locale string) map[string]any // locale "" = NULL
+	Save             func(handle, locale string, data map[string]any) error
+	EmptyOK          bool                               // true: blueprint tanpa field tetap dibuka (Globals menampilkan keadaan kosong)
+	Extra            func(handle string) map[string]any // ditambahkan ke respons GET (mis. saveAction)
+	FlashOnSave      func(handle string) string         // non-kosong: pesan flash yang tampil di halaman berikutnya
+}
+
+// RegisterContent memasang GET/POST {prefix}/api/content/{handle}.
+func RegisterContent(mux *http.ServeMux, a *web.App, prefix string, src Source) {
+	// resolve: item + blueprint + izin; dipakai GET dan POST.
+	resolve := func(r *http.Request, write bool) (handle, title string, b *bp, err error) {
 		u := web.CurrentUser(r)
-		if n, err = byHandle(r.PathValue("handle")); err != nil {
+		handle = r.PathValue("handle")
+		if title, b, err = src.Find(handle); err != nil {
 			return
 		}
-		if write && !canEdit(u, n.Handle) || !write && !canView(u, n.Handle) {
+		if write && !src.CanEdit(u, handle) || !write && !src.CanView(u, handle) {
 			err = errForbidden
 		}
-		if err == nil {
-			if b = blueprintOf(a, n); b == nil || len(b.Fields) == 0 {
+		if err == nil && (b == nil || len(b.Fields) == 0) {
+			if !src.EmptyOK {
 				err = apiErr("This navigation has no blueprint yet.")
+			} else if b == nil {
+				b = &bp{Tabs: []any{map[string]any{"handle": "main", "display": "Main"}}, Fields: []map[string]any{}}
 			}
 		}
 		return
@@ -728,13 +754,13 @@ func registerContent(mux *http.ServeMux, a *web.App, byHandle func(string) (navR
 		return out
 	}
 
-	a.Admin(mux, "GET /navigations/api/content/{handle}", func(w http.ResponseWriter, r *http.Request) {
-		n, b, err := resolve(r, false)
+	a.Admin(mux, "GET "+prefix+"/api/content/{handle}", func(w http.ResponseWriter, r *http.Request) {
+		handle, title, b, err := resolve(r, false)
 		if err != nil {
 			reply(w, nil, err)
 			return
 		}
-		ss := sites(a)
+		ss := src.Sites(handle)
 		active, origin, isOrigin := resolveSite(ss, r.URL.Query().Get("site"))
 		var bardContainer string // container gambar editor Bard: yang pertama menurut handle
 		a.DB.QueryRow(`SELECT handle FROM asset_containers ORDER BY handle LIMIT 1`).Scan(&bardContainer)
@@ -747,19 +773,25 @@ func registerContent(mux *http.ServeMux, a *web.App, byHandle func(string) (navR
 			}
 			rows.Close()
 		}
-		reply(w, map[string]any{
-			"navigation": map[string]any{"handle": n.Handle, "title": n.Title},
-			"blueprint":  b, "sites": ss, "activeSite": active, "isOrigin": isOrigin,
-			"data":    loadContent(a, n.Handle, b.Fields, active, origin),
-			"canEdit": canEdit(web.CurrentUser(r), n.Handle),
+		out := map[string]any{
+			"item":      map[string]any{"handle": handle, "title": title},
+			"blueprint": b, "sites": ss, "activeSite": active, "isOrigin": isOrigin,
+			"data":    loadContent(a, src, handle, b.Fields, active, origin),
+			"canEdit": src.CanEdit(web.CurrentUser(r), handle),
 			"entries": labelled(`SELECT id,collection,site,slug,data FROM entries ORDER BY collection, slug`),
 			"terms":   labelled(`SELECT id,taxonomy,site,slug,data FROM taxonomy_terms ORDER BY slug`),
 			"authors": authors, "bardContainer": bardContainer,
-		}, nil)
+		}
+		if src.Extra != nil {
+			for k, v := range src.Extra(handle) {
+				out[k] = v
+			}
+		}
+		reply(w, out, nil)
 	})
 
-	a.Admin(mux, "POST /navigations/api/content/{handle}", func(w http.ResponseWriter, r *http.Request) {
-		n, b, err := resolve(r, true)
+	a.Admin(mux, "POST "+prefix+"/api/content/{handle}", func(w http.ResponseWriter, r *http.Request) {
+		handle, _, b, err := resolve(r, true)
 		if err != nil {
 			reply(w, nil, err)
 			return
@@ -769,7 +801,7 @@ func registerContent(mux *http.ServeMux, a *web.App, byHandle func(string) (navR
 			reply(w, nil, err)
 			return
 		}
-		active, origin, isOrigin := resolveSite(sites(a), r.URL.Query().Get("site"))
+		active, origin, isOrigin := resolveSite(src.Sites(handle), r.URL.Query().Get("site"))
 		c := &chk{a: a, site: active, errs: map[string]string{}}
 		data := c.check(b.Fields, in.Data, "")
 		if len(c.errs) > 0 {
@@ -777,7 +809,7 @@ func registerContent(mux *http.ServeMux, a *web.App, byHandle func(string) (navR
 			return
 		}
 		if !isOrigin { // simpan hanya field yang benar-benar dioverride; sisanya tetap mengikuti bahasa default
-			originData := structure.LoadData(a.DB, n.Handle, "navigation", origin)
+			originData := src.Load(handle, origin)
 			localizeLinks(a, originData, b.Fields, active)
 			skip, over := nonLocalizable(b.Fields), map[string]any{}
 			for k, v := range data {
@@ -787,6 +819,11 @@ func registerContent(mux *http.ServeMux, a *web.App, byHandle func(string) (navR
 			}
 			data = over
 		}
-		reply(w, nil, structure.SaveData(a.DB, n.Handle, "navigation", active, data))
+		if err = src.Save(handle, active, data); err == nil && src.FlashOnSave != nil {
+			if m := src.FlashOnSave(handle); m != "" {
+				web.Flash(w, m)
+			}
+		}
+		reply(w, nil, err)
 	})
 }
