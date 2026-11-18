@@ -7,7 +7,8 @@ window.siteSettings = function (st, opts, tab) {
   return {
     ...st, errors: st.errors || {}, opts, tab,
     picker: {open: false, block: null, path: '', folders: [], files: [], loading: false},
-    init() { this.$watch('tab', t => history.replaceState(null, '', '?q=' + t)); },
+    // history.state milik Turbo (restorationIdentifier) harus dipertahankan; replaceState(null) membuat Turbo mengabaikan entri ini saat Back.
+    init() { this.$watch('tab', t => history.replaceState(history.state, '', '?q=' + t)); },
     payload() { const {errors, picker, opts, tab, ...rest} = this; return JSON.stringify(rest); },
     tabCls(t) { return this.tab === t ? 'border-zinc-800 font-medium text-zinc-900 dark:border-zinc-100 dark:text-zinc-100' : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'; },
     toggleAll(list, all) { const h = all.map(x => x.handle); this[list] = this[list].length === h.length ? [] : h; },

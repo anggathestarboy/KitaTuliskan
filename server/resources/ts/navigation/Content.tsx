@@ -49,7 +49,7 @@ export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation'
 
   const load = (site: string) => api.content(handle, site).then((d) => {
     setCd(d); setData(withUids(d.blueprint.fields, d.data)); setErrors({});
-    if (d.sites.length > 1) history.replaceState(null, '', `?site=${encodeURIComponent(d.activeSite)}`);
+    if (d.sites.length > 1) history.replaceState(history.state, '', `?site=${encodeURIComponent(d.activeSite)}`);
   }).catch((e) => setLoadError(e.message));
   useEffect(() => { load(new URLSearchParams(location.search).get('site') ?? ''); }, [api, handle]);
 
