@@ -1,0 +1,83 @@
+{
+  "taxonomy.breaking_news": {
+    "prefix": "taxonomy.breaking_news",
+    "scope": "astro",
+    "body": [
+      "taxonomy.breaking_news?.map((${1:item}) => (",
+      "\t$0",
+      "))"
+    ]
+  },
+  "taxonomy.csr": {
+    "prefix": "taxonomy.csr",
+    "scope": "astro",
+    "body": [
+      "taxonomy.csr?.map((${1:item}) => (",
+      "\t$0",
+      "))"
+    ]
+  },
+  "collection.pages": {
+    "prefix": "collection.pages",
+    "scope": "astro",
+    "body": [
+      "collection.pages?.map((${1:item}) => (",
+      "\t$0",
+      "))"
+    ]
+  },
+  "collection.news": {
+    "prefix": "collection.news",
+    "scope": "astro",
+    "body": [
+      "collection.news?.map((${1:item}) => (",
+      "\t$0",
+      "))"
+    ]
+  },
+  "navigation.header.site_image": {
+    "prefix": "navigation.header.site_image",
+    "scope": "astro",
+    "body": [
+      "navigation.header?.site_image?.map((${1:item}) => (",
+      "\t$0",
+      "))"
+    ]
+  },
+  "navigation.header.menu_loop": {
+    "prefix": "navigation.header.menu_loop",
+    "scope": "astro",
+    "body": [
+      "navigation.header?.menu_loop?.map((${1:item}) => (",
+      "\t$0",
+      "))"
+    ]
+  },
+  "global.global_sidebar.menu_loop": {
+    "prefix": "global.global_sidebar.menu_loop",
+    "scope": "astro",
+    "body": [
+      "global.global_sidebar?.menu_loop?.map((${1:item}) => (",
+      "\t$0",
+      "))"
+    ]
+  },
+  "menu_loop": {
+    "prefix": "menu_loop",
+    "scope": "astro",
+    "body": [
+      "menu_loop?.map((${1:item}) => (",
+      "\t$0",
+      "))"
+    ]
+  },
+  "menu_child_menu": {
+    "prefix": "menu_child_menu",
+    "scope": "astro",
+    "body": [
+      "menu_child_menu?.map((${1:child}) => (",
+      "\t$0",
+      "))"
+    ]
+  }
+}

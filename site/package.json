@@ -2,6 +2,6 @@
   "name": "draftcms-lite-site",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "astro dev", "build": "astro build", "preview": "astro preview" },
+  "scripts": { "dev": "astro dev", "types": "node plugins/cms-types.mjs", "build": "astro build", "preview": "astro preview" },
   "dependencies": { "astro": "^5.0.0", "@astrojs/node": "^9.0.0" }
 }

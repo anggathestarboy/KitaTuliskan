@@ -140,6 +140,21 @@ function TreeRow({ en, c }: { en: Entry; c: Ctx }) {
   );
 }
 
+// Urutan baru langsung tampil (optimistis, seperti navigation) tanpa menunggu server; order dinomori ulang seperti entry-reorder di server
+// (root mulai 1 = homepage, anak mulai 2) supaya ikon homepage ikut pindah.
+const resort = (list: Entry[], id: string, pos: number, site: string, base: number): Entry[] => {
+  const at = list.flatMap((e, i) => (e.site === site ? [i] : []));
+  const items = at.map((i) => list[i]), from = items.findIndex((e) => e.id === id);
+  if (from < 0) return list;
+  items.splice(pos, 0, ...items.splice(from, 1));
+  const out = [...list];
+  at.forEach((i, k) => { out[i] = { ...items[k], order: k + base }; });
+  return out;
+};
+const reposition = (list: Entry[], id: string, pos: number, parent: string | null, site: string): Entry[] =>
+  parent === null ? resort(list, id, pos, site, 1)
+    : list.map((e) => (e.id === parent ? { ...e, children: resort(e.children ?? [], id, pos, site, 2) } : { ...e, children: e.children && reposition(e.children, id, pos, parent, site) }));
+
 // Pohon disaring seperti query EntryManager: anak yang induknya tidak lolos filter ikut hilang.
 const prune = (nodes: Entry[], ok: (e: Entry) => boolean): Entry[] => nodes.filter(ok).map((n) => ({ ...n, children: prune(n.children ?? [], ok) }));
 
@@ -183,7 +198,10 @@ export function Entries({ cp, handle }: { cp: string; handle: string }) {
     duplicate: (id) => act('entry-duplicate', { id }, 'Entry duplicated.'),
     askDelete: (e) => { setAllLocales(true); setDel(e); },
     openMenu: (e, en) => { if (!en.canEdit && !en.canDelete) return; e.preventDefault(); e.stopPropagation(); setMenu({ en, x: e.clientX - 20, y: e.clientY + 10 }); },
-    reorder: (id, position, parentId) => act('entry-reorder', { id, position, parentId, site: filter }, ''),
+    reorder: (id, position, parentId) => {
+      setD({ ...d, entries: reposition(d.entries, id, position, parentId, filter) });
+      call(`${api}/entry-reorder/${encodeURIComponent(handle)}`, { id, position, parentId, site: filter }).catch((e) => { toast(e.message, true); load(); }); // gagal → kembalikan dari server
+    },
   };
   const menuActions = (en: Entry): MenuAction[] => [
     en.canEdit && { label: 'Edit', run: () => visit(`${cp}/collections/${handle}/entries/${en.id}`) },
