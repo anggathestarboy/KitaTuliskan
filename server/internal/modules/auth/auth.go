@@ -42,10 +42,7 @@ func Register(mux *http.ServeMux, a *web.App) {
 
 	mux.HandleFunc("GET "+cp("/forgot-password"), a.Guest(func(w http.ResponseWriter, r *http.Request) { a.Render(w, r, "auth/forgot-password.html", nil) }))
 	mux.HandleFunc("POST "+cp("/forgot-password"), a.Guest(func(w http.ResponseWriter, r *http.Request) {
-		email := strings.ToLower(r.FormValue("email"))
-		tok := web.Token()
-		a.DB.Exec(`REPLACE INTO password_reset_tokens(email,token,created_at) VALUES(?,?,?)`, email, tok, web.Now())
-		mail.Send(email, "Reset Password Notification", "Reset your password: "+os.Getenv("APP_URL")+cp("/reset-password/")+tok+"?email="+email+"\nThis link expires in 60 minutes.")
+		SendResetLink(a, strings.ToLower(r.FormValue("email")))
 		a.Render(w, r, "auth/forgot-password.html", map[string]any{"Status": "A reset link will be sent if the account exists."})
 	}))
 	mux.HandleFunc("GET "+cp("/reset-password/{token}"), a.Guest(func(w http.ResponseWriter, r *http.Request) {
@@ -159,6 +156,13 @@ func Register(mux *http.ServeMux, a *web.App) {
 		http.Redirect(w, r, "/settings/security", http.StatusFound)
 	})))
 	mux.HandleFunc("GET /settings/appearance", a.Auth(func(w http.ResponseWriter, r *http.Request) { a.Render(w, r, "auth/appearance.html", nil) }))
+}
+
+// SendResetLink = Password::sendResetLink(): token baru + email. Dipakai "Forgot password" dan aksi admin di modul Users.
+func SendResetLink(a *web.App, email string) {
+	tok := web.Token()
+	a.DB.Exec(`REPLACE INTO password_reset_tokens(email,token,created_at) VALUES(?,?,?)`, email, tok, web.Now())
+	mail.Send(email, "Reset Password Notification", "Reset your password: "+os.Getenv("APP_URL")+a.CP("/reset-password/")+tok+"?email="+email+"\nThis link expires in 60 minutes.")
 }
 
 func SendVerification(a *web.App, id, email string) {

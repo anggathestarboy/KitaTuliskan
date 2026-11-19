@@ -3,10 +3,28 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon, cn } from './ui';
 
-// flux:badge size="sm" color="zinc"
-export const Badge = ({ children }: { children: ReactNode }) => (
-  <span className="inline-flex items-center rounded-md bg-zinc-400/15 px-2 py-1 text-xs font-medium whitespace-nowrap text-zinc-700 [print-color-adjust:exact] dark:bg-zinc-400/40 dark:text-zinc-200">{children}</span>
+// flux:badge size="sm": color zinc (default) / green / red.
+const badgeColor = {
+  zinc: 'bg-zinc-400/15 text-zinc-700 dark:bg-zinc-400/40 dark:text-zinc-200',
+  green: 'bg-green-400/20 text-green-800 dark:bg-green-400/40 dark:text-green-200',
+  red: 'bg-red-400/20 text-red-800 dark:bg-red-400/40 dark:text-red-200',
+};
+export const Badge = ({ children, color = 'zinc' }: { children: ReactNode; color?: keyof typeof badgeColor }) => (
+  <span className={cn('inline-flex items-center rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap [print-color-adjust:exact]', badgeColor[color])}>{children}</span>
 );
+
+// flux:switch (+ label/description)
+export function Switch({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div><p className="text-sm font-medium text-zinc-800 dark:text-white">{label}</p>{description && <p className="mt-1 text-sm text-zinc-500 dark:text-white/60">{description}</p>}</div>
+      <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)}
+        className={cn('relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition', checked ? 'bg-[var(--color-accent)]' : 'bg-zinc-300 dark:bg-white/20')}>
+        <span className={cn('absolute top-0.5 size-4 rounded-full bg-white shadow transition-all', checked ? 'left-[1.125rem]' : 'left-0.5')} />
+      </button>
+    </div>
+  );
+}
 
 // flux:checkbox: kotak 1.125rem, centang pakai warna accent.
 export function Checkbox({ label, description, checked, onChange, disabled }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
