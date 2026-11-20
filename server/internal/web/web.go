@@ -129,6 +129,9 @@ func (a *App) sidebar(u *User) []SidebarItem {
 	a.DB.QueryRow(`SELECT tree FROM trees WHERE handle='sidebar-admin' AND type='navigation' LIMIT 1`).Scan(&raw)
 	var items []SidebarItem
 	json.Unmarshal([]byte(raw.String), &items)
+	if os.Getenv("ACTIVITY_LOG_ENABLED") != "true" { // menu Activity Log hanya tampil kalau modul aktif
+		items = dropURL(items, a.CP("/activity-log"))
+	}
 	a.resolvePages(items)
 	if u.IsSuper() {
 		return items
@@ -157,6 +160,16 @@ func (a *App) sidebar(u *User) []SidebarItem {
 		return
 	}
 	return filter(items)
+}
+
+func dropURL(in []SidebarItem, url string) (out []SidebarItem) {
+	for _, it := range in {
+		if it.URL != url {
+			it.Children = dropURL(it.Children, url)
+			out = append(out, it)
+		}
+	}
+	return
 }
 
 func Flash(w http.ResponseWriter, msg string) {

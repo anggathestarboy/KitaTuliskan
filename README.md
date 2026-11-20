@@ -66,7 +66,7 @@ Status: **done** = fungsi inti ada · **list** = baru index/create/delete generi
 | Sitemap | `sitemap` | `/sitemap` ; publik `/sitemap.xml` `/sitemap-{collection}.xml` | sitemaps | done (dasar) | SitemapSyncer (isi tabel dari entries published), xsl stylesheet, toggle per baris |
 | Redirects | `redirects` | `/redirect-manager` ; middleware publik | redirects | done | edit, start/end window UI, hits sudah dihitung |
 | SiteSettings | `sitesettings` | `/site-settings` ; publik `/robots.txt` `/llms.txt` | site_settings | done (dasar) | schema markup blocks, integrations, LlmsTxtGenerator |
-| ActivityLog | `activitylog` | `/activity-log` (ACTIVITY_LOG_ENABLED=true) | activity_logs, deletion_requests | list | panggil `activitylog.Record()` dari modul lain, auth events, hapus per tahun via email konfirmasi |
+| ActivityLog | `activitylog` | `/activity-log` `/activity-log/export` `/activity-log/restore` `/activity-log/delete-request` `/activity-log/confirm-delete/{token}` | activity_logs, activity_log_deletion_requests | done (list + filter + pagination, export/restore JSON, hapus per tahun via email konfirmasi, event login/logout/gagal login) | Opt-in, default mati: `make activity_log` (= `php artisan draft:activity_log`) set `ACTIVITY_LOG_ENABLED=true` di `server/.env`, lalu restart server (`make dev` restart sendiri). Modul lain mencatat lewat `activitylog.Record()` / `RecordProps()` (no-op saat mati). Hapus per tahun khusus superadmin: request → email link (24 jam) → konfirmasi → dieksekusi tiap 00:00, atau manual `go run . activity_log:process`. Permission: `view activity log`, `view activity log detail`, `export activity log`, `import activity log`. Pencatatan sinkron (tanpa queue); link email memakai `APP_URL` |
 | NotFoundDetector | `notfounddetector` | `/404-detector` | — | stub | NotFoundScanner |
 | PackageUpdates | `packageupdates` | `/package-updates` | — | stub (tampilkan go.mod) | PackageUpdateChecker |
 | About | `about` | `/about` | — | done | — |
@@ -75,7 +75,7 @@ Status: **done** = fungsi inti ada · **list** = baru index/create/delete generi
 
 1. **Blueprints** dulu, satu orang, sampai `web.RenderFields/ParseFields` jadi. Collections, Taxonomies, Globals, Forms, Navigation semua menunggu ini.
 2. Setelah itu paralel: **Dev A** Collections → Taxonomies → Sites → `site/` Astro. **Dev B** Media (AssetPicker) → Navigation → Globals → Forms → Users.
-3. Sisanya (Sitemap syncer, ActivityLog hook, 404 Detector, Package Updates) kapan saja, tidak ada yang menunggu.
+3. Sisanya (Sitemap syncer, 404 Detector, Package Updates) kapan saja, tidak ada yang menunggu.
 
 ### Pola yang dipakai
 
