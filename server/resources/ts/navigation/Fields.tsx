@@ -57,8 +57,8 @@ export function visible(f: Field, scope: Bag): boolean {
 
 /* ---------- potongan umum ---------- */
 
-const desc = 'mt-0 text-xs text-zinc-500 dark:text-white/60';
-const errCls = 'text-sm font-normal text-red-600 dark:text-red-400';
+export const desc = 'mt-0 text-xs text-zinc-500 dark:text-white/60';
+export const errCls = 'text-sm font-normal text-red-600 dark:text-red-400';
 
 function Label({ f }: { f: Field }) {
   return <label title={f.handle} className="mb-3 inline-flex items-center text-sm font-medium text-zinc-800 dark:text-white">{f.display ?? f.handle}{f.required && <>&nbsp;<span className="text-red-500">*</span></>}</label>;
@@ -91,7 +91,7 @@ const range = (f: Field, unit: string) => {
 
 const opts = (f: Field) => (Array.isArray(f.options) ? f.options : []);
 
-const area = 'block w-full resize-y rounded-lg border border-zinc-200 border-b-zinc-300/80 bg-white p-3 text-base text-zinc-700 shadow-xs placeholder-zinc-400 sm:text-sm dark:border-white/10 dark:bg-white/10 dark:text-zinc-300 dark:placeholder-zinc-400 dark:shadow-none';
+export const area = 'block w-full resize-y rounded-lg border border-zinc-200 border-b-zinc-300/80 bg-white p-3 text-base text-zinc-700 shadow-xs placeholder-zinc-400 sm:text-sm dark:border-white/10 dark:bg-white/10 dark:text-zinc-300 dark:placeholder-zinc-400 dark:shadow-none';
 
 function Switch({ on, onChange, title }: { on: boolean; onChange: (v: boolean) => void; title?: string }) {
   return (

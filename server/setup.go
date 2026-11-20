@@ -36,11 +36,13 @@ func setup(a *web.App, args []string) {
 	a.DB.Exec(`INSERT IGNORE INTO sites(handle,name,url,locale,lang,attributes,created_at,updated_at) VALUES(?,?,'/','id_ID','id','{}',?,?)`, *siteHandle, *siteName, now, now)
 	a.DB.Exec(`INSERT IGNORE INTO collections(handle,title,settings,created_at,updated_at) VALUES('pages','Pages','{"route":"/{slug}"}',?,?)`, now, now)
 	a.DB.Exec(`INSERT IGNORE INTO blueprints(namespace,handle,data,created_at,updated_at) VALUES('collections.pages','homepage',
-		'{"title":"Homepage","template":"homepage","fields":[{"handle":"title","type":"text","display":"Title","required":true},{"handle":"content","type":"markdown","display":"Content"}]}',?,?)`, now, now)
+		'{"title":"Homepage","template":"pages.static.homepage","fields":[{"handle":"heading","type":"text","display":"Heading","required":true},{"handle":"subheading","type":"textarea","display":"Subheading"},{"handle":"content","type":"bard","display":"Content"}]}',?,?)`, now, now)
+	// DB lama menyimpan template "homepage" (bukan nama view) → blueprint tidak bisa disimpan ("selected template is invalid").
+	a.DB.Exec(`UPDATE blueprints SET data=JSON_SET(data,'$.template','pages.static.homepage') WHERE namespace='collections.pages' AND handle='homepage' AND JSON_UNQUOTE(JSON_EXTRACT(data,'$.template'))='homepage'`)
 	a.DB.QueryRow(`SELECT COUNT(*) FROM entries WHERE collection='pages' AND slug='home'`).Scan(&n)
 	if n == 0 {
 		a.DB.Exec(`INSERT INTO entries(id,site,published,status,slug,uri,collection,blueprint,data,created_at,updated_at) VALUES(?,?,1,'published','home','/','pages','homepage',?,?,?)`,
-			web.UUID(), *siteHandle, `{"title":"Welcome to Draft CMS","content":"If your dreams don't scare you, they are not big enough."}`, now, now)
+			web.UUID(), *siteHandle, `{"heading":"Welcome to Draft CMS","subheading":"If your dreams don't scare you, they are not big enough."}`, now, now)
 	}
 	navigation.SeedAdminSidebar(a, false)
 	fmt.Println("✓ setup selesai. Login di", a.CP("/login"))

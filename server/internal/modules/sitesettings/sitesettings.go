@@ -268,30 +268,8 @@ func validate(st State) map[string]string {
 	if len(st.GscVerificationCode) > 255 {
 		errs["gscVerificationCode"] = "The verification code must not be greater than 255 characters."
 	}
-	for i, b := range st.SchemaBlocks {
-		k := func(f string) string { return "schemaBlocks." + web.Itoa(int64(i)) + "." + f }
-		ok := false
-		for _, t := range SchemaTypes {
-			ok = ok || t == b.Type
-		}
-		if !ok {
-			errs[k("type")] = "The selected schema type is invalid."
-		}
-		if b.Email != "" {
-			if _, err := mail.ParseAddress(b.Email); err != nil || len(b.Email) > 255 {
-				errs[k("email")] = "The email must be a valid email address."
-			}
-		}
-		for f, max := range map[string]int{"name": 255, "alternate_name": 255, "description": 1000, "logo": 2048, "telephone": 50, "contact_type": 255, "address_street": 255, "address_locality": 255, "address_region": 255, "address_postal": 50, "address_country": 255, "service_type": 255, "area_served": 255} {
-			if len(fieldOf(b, f)) > max {
-				errs[k(f)] = "The " + strings.ReplaceAll(f, "_", " ") + " must not be greater than " + web.Itoa(int64(max)) + " characters."
-			}
-		}
-		for _, u := range b.SameAs {
-			if len(u) > 2048 {
-				errs[k("same_as")] = "Each profile URL must not be greater than 2048 characters."
-			}
-		}
+	for k, v := range ValidateBlocks(st.SchemaBlocks) {
+		errs[k] = v
 	}
 	return errs
 }
@@ -435,4 +413,44 @@ func Build(b Block) map[string]any {
 		}
 	}
 	return m
+}
+
+// ValidateBlocks = schemaBlockValidationRules(): kunci "schemaBlocks.{i}.{field}". Dipakai juga tab Schema di entry (Collections).
+func ValidateBlocks(blocks []Block) map[string]string {
+	errs := map[string]string{}
+	for i, b := range blocks {
+		k := func(f string) string { return "schemaBlocks." + web.Itoa(int64(i)) + "." + f }
+		ok := false
+		for _, t := range SchemaTypes {
+			ok = ok || t == b.Type
+		}
+		if !ok {
+			errs[k("type")] = "The selected schema type is invalid."
+		}
+		if b.Email != "" {
+			if _, err := mail.ParseAddress(b.Email); err != nil || len(b.Email) > 255 {
+				errs[k("email")] = "The email must be a valid email address."
+			}
+		}
+		for f, max := range map[string]int{"name": 255, "alternate_name": 255, "description": 1000, "logo": 2048, "telephone": 50, "contact_type": 255, "address_street": 255, "address_locality": 255, "address_region": 255, "address_postal": 50, "address_country": 255, "service_type": 255, "area_served": 255} {
+			if len(fieldOf(b, f)) > max {
+				errs[k(f)] = "The " + strings.ReplaceAll(f, "_", " ") + " must not be greater than " + web.Itoa(int64(max)) + " characters."
+			}
+		}
+		for _, u := range b.SameAs {
+			if len(u) > 2048 {
+				errs[k("same_as")] = "Each profile URL must not be greater than 2048 characters."
+			}
+		}
+	}
+	return errs
+}
+
+// CleanBlocks = cleanedSchemaBlocks(): buang sameAs kosong.
+func CleanBlocks(blocks []Block) []Block {
+	out := nonNilBlocks(blocks)
+	for i := range out {
+		out[i].SameAs = compact(out[i].SameAs)
+	}
+	return out
 }

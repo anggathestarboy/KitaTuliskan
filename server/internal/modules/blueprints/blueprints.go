@@ -390,18 +390,18 @@ func namespaces(a *web.App) []Option {
 	return out
 }
 
-// templates = availableTemplates(): source membaca resources/views/pages/*.blade.php; di sini halaman Astro site/src/pages/*.astro,
-// disimpan dengan notasi titik yang sama ("pages.dynamic.home").
+// templates = availableTemplates(): source membaca resources/views/pages/**/*.blade.php; di sini view Astro
+// site/src/views/pages/**/*.astro (dirender oleh site/src/pages/[...slug].astro), notasi titik sama ("pages.static.homepage").
 func templates() []string {
-	dir := os.Getenv("SITE_PAGES_DIR")
+	dir := os.Getenv("SITE_VIEWS_DIR")
 	if dir == "" {
-		dir = "../site/src/pages"
+		dir = "../site/src/views"
 	}
 	out := []string{}
-	filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+	filepath.WalkDir(filepath.Join(dir, "pages"), func(p string, d fs.DirEntry, err error) error {
 		if err == nil && !d.IsDir() && strings.HasSuffix(p, ".astro") {
 			rel, _ := filepath.Rel(dir, p)
-			out = append(out, "pages."+strings.ReplaceAll(strings.TrimSuffix(filepath.ToSlash(rel), ".astro"), "/", "."))
+			out = append(out, strings.ReplaceAll(strings.TrimSuffix(filepath.ToSlash(rel), ".astro"), "/", "."))
 		}
 		return nil
 	})

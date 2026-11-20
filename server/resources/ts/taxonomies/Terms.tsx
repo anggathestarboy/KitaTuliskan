@@ -12,7 +12,7 @@ interface Data {
 }
 
 // = App\Support\SiteColors: titik warna per bahasa/negara di tabel.
-const COLORS: Record<string, string> = {
+export const COLORS: Record<string, string> = {
   indonesia: 'bg-red-500', english: 'bg-blue-500', arabic: 'bg-emerald-500', mandarin: 'bg-amber-500', chinese: 'bg-amber-500', japanese: 'bg-pink-500',
   korean: 'bg-violet-500', thai: 'bg-cyan-500', vietnamese: 'bg-lime-500', malay: 'bg-indigo-500', tagalog: 'bg-orange-500', filipino: 'bg-orange-500',
   hindi: 'bg-fuchsia-500', german: 'bg-slate-500', french: 'bg-sky-500', spanish: 'bg-yellow-500', portuguese: 'bg-teal-500', dutch: 'bg-orange-600',

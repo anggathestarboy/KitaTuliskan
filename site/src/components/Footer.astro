@@ -1,0 +1,12 @@
+---
+const { site, sites, global, navigation } = Astro.locals;
+const items: any[] = Array.isArray(navigation.footer) ? navigation.footer : [];
+---
+
+<footer style="padding:1.5rem;border-top:1px solid #e5e7eb;font-size:.875rem;color:#6b7280;display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between">
+   <span>© {new Date().getFullYear()} {global.site_settings?.site_name ?? site?.name}</span>
+   <nav style="display:flex;gap:1rem">
+      {items.map((i) => <a href={i.url ?? '#'} target={i.target}>{i.title}</a>)}
+      {sites.length > 1 && sites.map((s) => <a href={new URL(s.url || '/', 'http://x').pathname}>{s.name}</a>)}
+   </nav>
+</footer>

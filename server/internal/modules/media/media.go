@@ -534,6 +534,24 @@ func view(a *web.App, c Container, as Asset) map[string]any {
 	}
 }
 
+// PublicAssets = semua asset di container disk "public" dalam bentuk view(), untuk /api/assets (Astro me-resolve id → objek
+// {url, alt, width, height, loading, ...}). Container private tidak ikut: URL-nya butuh login.
+func PublicAssets(a *web.App) []map[string]any {
+	s := Store{a.DB}
+	out := []map[string]any{}
+	cs, _ := s.Containers()
+	for _, c := range cs {
+		if c.Disk != "public" {
+			continue
+		}
+		found, _ := s.assets("container=?", c.Handle)
+		for _, f := range found {
+			out = append(out, view(a, c, f))
+		}
+	}
+	return out
+}
+
 func escape(p string) string {
 	parts := strings.Split(p, "/")
 	for i, s := range parts {

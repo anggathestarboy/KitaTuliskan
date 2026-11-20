@@ -106,6 +106,16 @@ func reply(w http.ResponseWriter, out any, err error) {
 // Dipakai ulang modul lain yang menyajikan JSON API sejenis (Globals).
 type APIErr = apiErr
 
+// FieldErrs membangun error validasi per-field (422 {error, errors}); FieldErrsOf membacanya kembali dari Validate().
+func FieldErrs(first string, all map[string]string) error { return fieldErrs{msg: first, all: all} }
+func FieldErrsOf(err error) (first string, all map[string]string, ok bool) {
+	var fe fieldErrs
+	if errors.As(err, &fe) {
+		return fe.msg, fe.all, true
+	}
+	return "", nil, false
+}
+
 var (
 	Reply        = reply
 	Decode       = decode

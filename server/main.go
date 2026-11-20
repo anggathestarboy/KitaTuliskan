@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -96,6 +98,10 @@ func main() {
 		activitylog.Register(mux, app)
 	}
 
+	mux.HandleFunc("GET /api/assets", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(media.PublicAssets(app))
+	})
 	// JSON publik untuk Astro (PageController + Blade directives di source diganti fetch saat build).
 	mux.HandleFunc("GET /api/{table}", func(w http.ResponseWriter, r *http.Request) {
 		t := r.PathValue("table")
@@ -112,12 +118,18 @@ func main() {
 		json.NewEncoder(w).Encode(rows)
 	})
 
-	// Catch-all publik: ApplyRedirects, lalu 404 (halaman publik dirender Astro, bukan Go).
+	// Catch-all publik (= PageController): sitemap/redirect dulu, sisanya diteruskan ke Astro yang merender view blueprint.
+	// SITE_URL = `astro dev` (default :4321) atau host hasil build; tanpa itu halaman publik 404.
+	site, _ := url.Parse(env("SITE_URL", "http://localhost:4321"))
+	astro := httputil.NewSingleHostReverseProxy(site)
+	astro.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		http.Error(w, "Site (Astro) tidak bisa dijangkau di "+site.String()+" — jalankan `npm run dev` di folder site/.", http.StatusBadGateway)
+	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if sitemap.Collection(app, w, r) || redirects.Apply(app, w, r) {
 			return
 		}
-		http.NotFound(w, r)
+		astro.ServeHTTP(w, r)
 	})
 
 	csrf := http.NewCrossOriginProtection() // pengganti @csrf: tolak POST lintas origin

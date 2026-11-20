@@ -1,0 +1,4 @@
+{{template "app" .}}
+{{define "title"}}{{.CollTitle}} entries{{end}}
+{{define "content"}}<collections-entries data-cp="{{.CP}}" data-handle="{{.Handle}}"></collections-entries>
+{{vite "resources/ts/collections/main.tsx"}}{{end}}

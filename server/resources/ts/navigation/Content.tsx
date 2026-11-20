@@ -9,7 +9,7 @@ import { AssetPicker, type PickerState } from './AssetPicker';
 import { ApiError, type ContentData, type Field, client, slug as slugify, visit } from './api';
 import { type Bag, type Env, FieldView, Locked, type Path, uid, visible } from './Fields';
 
-const put = (d: unknown, path: Path, v: unknown): unknown => {
+export const put = (d: unknown, path: Path, v: unknown): unknown => {
   if (!path.length) return v;
   const [k, ...rest] = path;
   const copy: unknown = Array.isArray(d) ? [...d] : { ...(d as object) };
@@ -18,14 +18,14 @@ const put = (d: unknown, path: Path, v: unknown): unknown => {
 };
 
 // Setiap baris replicator butuh _uid (kunci React & editor Bard); dibuang lagi saat simpan, seperti stripRowUids.
-function withUids(fields: Field[], data: Bag): Bag {
+export function withUids(fields: Field[], data: Bag): Bag {
   const out = { ...data };
   for (const f of fields) if (f.type === 'replicator') out[f.handle] = ((out[f.handle] as Bag[]) ?? []).map((r) => ({ _uid: uid(), ...withUids(f.replicator_fields ?? [], r) }));
   return out;
 }
-const strip = (v: unknown): unknown => Array.isArray(v) ? v.map(strip) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([k]) => k !== '_uid').map(([k, x]) => [k, strip(x)])) : v;
+export const strip = (v: unknown): unknown => Array.isArray(v) ? v.map(strip) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([k]) => k !== '_uid').map(([k, x]) => [k, strip(x)])) : v;
 
-function assetIds(fields: Field[], data: Bag, out: number[] = []): number[] {
+export function assetIds(fields: Field[], data: Bag, out: number[] = []): number[] {
   for (const f of fields) {
     const v = data[f.handle];
     if (f.type === 'assets' && Array.isArray(v)) out.push(...v.map(Number));

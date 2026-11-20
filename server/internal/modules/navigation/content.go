@@ -40,9 +40,34 @@ func BlueprintFor(a *web.App, ns, handle, explicit string) *bp {
 	if explicit != "" {
 		q, arg = `SELECT handle,data FROM blueprints WHERE handle=? ORDER BY id LIMIT 1`, explicit
 	}
+	return loadBP(a, q, arg)
+}
+
+// BlueprintIn = availableBlueprints()->firstWhere(handle): blueprint {handle} di namespace "{ns}.{owner}" (Collections: "collections.pages").
+func BlueprintIn(a *web.App, namespace, handle string) *bp {
+	return loadBP(a, `SELECT handle,data FROM blueprints WHERE namespace=? AND handle=? ORDER BY id LIMIT 1`, namespace, handle)
+}
+
+// BlueprintHandles = availableBlueprints(): semua handle blueprint di satu namespace, urut handle.
+func BlueprintHandles(a *web.App, namespace string) []string {
+	out := []string{}
+	rows, err := a.DB.Query(`SELECT handle FROM blueprints WHERE namespace=? ORDER BY handle`, namespace)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var h string
+		rows.Scan(&h)
+		out = append(out, h)
+	}
+	return out
+}
+
+func loadBP(a *web.App, q string, args ...any) *bp {
 	var b bp
 	var raw []byte
-	if a.DB.QueryRow(q, arg).Scan(&b.Handle, &raw) != nil {
+	if a.DB.QueryRow(q, args...).Scan(&b.Handle, &raw) != nil {
 		return nil
 	}
 	var d struct {
@@ -50,7 +75,7 @@ func BlueprintFor(a *web.App, ns, handle, explicit string) *bp {
 		Fields []map[string]any
 	}
 	json.Unmarshal(raw, &d)
-	b.Tabs, b.Fields = d.Tabs, d.Fields
+	b.Tabs, b.Fields = d.Tabs, expandFieldsets(a, d.Fields, nil)
 	if b.Tabs == nil {
 		b.Tabs = []any{map[string]any{"handle": "main", "display": "Main"}}
 	}
@@ -58,6 +83,36 @@ func BlueprintFor(a *web.App, ns, handle, explicit string) *bp {
 		b.Fields = []map[string]any{}
 	}
 	return &b
+}
+
+// expandFieldsets = Entry::expandFieldsets: field bertipe "fieldset" diganti isi fieldset-nya (rekursif, tahan siklus); replicator ikut diperluas.
+func expandFieldsets(a *web.App, fields []map[string]any, seen []string) []map[string]any {
+	var out []map[string]any
+	for _, f := range fields {
+		switch str(f["type"]) {
+		case "fieldset":
+			h := str(f["options"])
+			if h == "" || slices.Contains(seen, h) {
+				continue
+			}
+			var raw []byte
+			var d struct{ Fields []map[string]any }
+			if a.DB.QueryRow(`SELECT data FROM fieldsets WHERE handle=?`, h).Scan(&raw) == nil {
+				json.Unmarshal(raw, &d)
+			}
+			out = append(out, expandFieldsets(a, d.Fields, append(slices.Clone(seen), h))...)
+		case "replicator":
+			sub := []any{}
+			for _, x := range expandFieldsets(a, subfields(f), seen) {
+				sub = append(sub, x)
+			}
+			f["replicator_fields"] = sub
+			out = append(out, f)
+		default:
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 func blueprintOf(a *web.App, n navRow) *bp {
