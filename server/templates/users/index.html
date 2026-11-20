@@ -1,0 +1,4 @@
+{{template "app" .}}
+{{define "title"}}Users{{end}}
+{{define "content"}}<users-manager data-cp="{{.CP}}"></users-manager>
+{{vite "resources/ts/users/main.tsx"}}{{end}}

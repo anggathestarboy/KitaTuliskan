@@ -1,0 +1,4 @@
+{{template "app" .}}
+{{define "title"}}User{{end}}
+{{define "content"}}<users-form data-cp="{{.CP}}" data-id="{{.ID}}"></users-form>
+{{vite "resources/ts/users/main.tsx"}}{{end}}
