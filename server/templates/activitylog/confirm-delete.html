@@ -1,0 +1,15 @@
+{{template "app" .}}
+{{define "title"}}Confirm deletion{{end}}
+{{define "content"}}
+{{$ok := `<svg class="mx-auto size-10 %s" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`}}
+{{$no := `<svg class="mx-auto size-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`}}
+<div class="mx-auto max-w-lg space-y-4 py-10 text-center">
+  {{if eq .Status "confirmed"}}{{printf $ok "text-green-500" | safe}}<h2 class="text-lg font-semibold text-zinc-800 dark:text-white">Deletion confirmed</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">Activity log entries from {{.Year}} are scheduled for permanent deletion tonight at 00:00.</p>
+  {{else if eq .Status "already_confirmed"}}{{printf $ok "text-amber-500" | safe}}<h2 class="text-lg font-semibold text-zinc-800 dark:text-white">Already confirmed</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">This request was already confirmed and is waiting for tonight's scheduled run.</p>
+  {{else if eq .Status "already_executed"}}{{printf $ok "text-zinc-500" | safe}}<h2 class="text-lg font-semibold text-zinc-800 dark:text-white">Already executed</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">Those entries have already been permanently deleted.</p>
+  {{else if eq .Status "expired"}}{{safe $no}}<h2 class="text-lg font-semibold text-zinc-800 dark:text-white">Link expired</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">This confirmation link expired 24 hours after it was sent. Request the deletion again from the Activity Log page.</p>
+  {{else if eq .Status "forbidden"}}{{safe $no}}<h2 class="text-lg font-semibold text-zinc-800 dark:text-white">Not authorized</h2><p class="text-sm text-zinc-500 dark:text-zinc-400">Only a superadmin can confirm this.</p>
+  {{else}}{{safe $no}}<h2 class="text-lg font-semibold text-zinc-800 dark:text-white">Request not found</h2>{{end}}
+  {{template "button" (dict "Label" "Back to Activity Log" "Href" (print .CP "/activity-log"))}}
+</div>
+{{end}}

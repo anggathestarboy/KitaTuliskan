@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"draftcms-lite/internal/mail"
+	"draftcms-lite/internal/modules/activitylog"
 	"draftcms-lite/internal/web"
 
 	"golang.org/x/crypto/bcrypt"
@@ -19,10 +20,20 @@ func Register(mux *http.ServeMux, a *web.App) {
 	cp := a.CP
 	mux.HandleFunc("GET "+cp("/login"), a.Guest(func(w http.ResponseWriter, r *http.Request) { a.Render(w, r, "auth/login.html", nil) }))
 	mux.HandleFunc("POST "+cp("/login"), a.Guest(func(w http.ResponseWriter, r *http.Request) {
-		var id, hash string
+		var id, hash, name string
 		var banned sql.NullString
-		err := a.DB.QueryRow(`SELECT id,password,banned_at FROM users WHERE email=?`, strings.ToLower(r.FormValue("email"))).Scan(&id, &hash, &banned)
+		err := a.DB.QueryRow(`SELECT id,password,banned_at,name FROM users WHERE email=?`, strings.ToLower(r.FormValue("email"))).Scan(&id, &hash, &banned, &name)
 		if err != nil || bcrypt.CompareHashAndPassword([]byte(hash), []byte(r.FormValue("password"))) != nil {
+			if err != nil {
+				id = ""
+			}
+			// Listener Failed: subject = user bila emailnya dikenal, actor kosong (belum login).
+			email := r.FormValue("email")
+			subj := ""
+			if id != "" {
+				subj = "user"
+			}
+			activitylog.RecordProps(a, "", "login_failed", subj, id, "Failed login attempt for "+email, nil, map[string]any{"ip": activitylog.IP(r), "email": email})
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			a.Render(w, r, "auth/login.html", map[string]any{"Error": "These credentials do not match our records.", "Email": r.FormValue("email")})
 			return
@@ -33,9 +44,13 @@ func Register(mux *http.ServeMux, a *web.App) {
 			return
 		}
 		a.Login(w, r, id)
+		activitylog.RecordProps(a, id, "logged_in", "user", id, name+" logged in", nil, map[string]any{"ip": activitylog.IP(r)})
 		http.Redirect(w, r, cp("/dashboard"), http.StatusFound)
 	}))
 	mux.HandleFunc("POST "+cp("/logout"), func(w http.ResponseWriter, r *http.Request) {
+		if u := web.CurrentUser(r); u != nil {
+			activitylog.RecordProps(a, u.ID, "logged_out", "user", u.ID, u.Name+" logged out", nil, map[string]any{"ip": activitylog.IP(r)})
+		}
 		a.Logout(w, r)
 		http.Redirect(w, r, cp("/login"), http.StatusFound)
 	})

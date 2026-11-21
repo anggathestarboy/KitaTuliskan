@@ -1,9 +1,112 @@
 {{template "app" .}}
 {{define "title"}}Activity Log{{end}}
 {{define "content"}}
-<section class="w-full space-y-6">
-{{template "page-header" (dict "Title" "Activity Log" "Action" (safe ``))}}
-{{template "card-open"}}<table class="w-full"><thead class="bg-zinc-100 dark:bg-zinc-900"><tr>{{template "th" "When"}}{{template "th" "User"}}{{template "th" "Action"}}{{template "th" "Description"}}</tr></thead>
-<tbody>{{range .Rows}}<tr class="{{template "tr-class"}}"><td class="{{template "td-class"}}">{{index . "created_at"}}</td><td class="{{template "td-class"}}">{{index . "user_name"}}</td><td class="{{template "td-class"}}">{{index . "action"}}</td><td class="{{template "td-class"}}">{{index . "description"}}</td></tr>{{else}}<tr><td colspan="4" class="px-3 py-10 text-center text-sm text-zinc-500">No activity yet.</td></tr>{{end}}</tbody></table>{{template "card-close"}}
+{{$in := "block h-8 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-700 shadow-xs placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-800/10 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"}}
+{{$btn := "inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-medium shadow-xs"}}
+{{$def := print $btn " border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-700 dark:text-white dark:hover:bg-zinc-600"}}
+{{$ghost := print $btn " border-transparent shadow-none text-zinc-800 hover:bg-zinc-800/5 dark:text-white dark:hover:bg-white/10"}}
+{{$danger := print $btn " border-transparent bg-red-500 text-white hover:bg-red-600"}}
+<section class="w-full space-y-6" x-data="{ viewing: null }">
+  <div class="flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-xl border border-zinc-200 px-2 py-2 md:px-4 dark:border-zinc-500">
+    <div class="flex items-center gap-2">
+      <svg class="size-6 text-zinc-800 dark:text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+      <h1 class="text-xl font-semibold text-zinc-800 dark:text-white">Activity Log</h1>
+    </div>
+  </div>
+
+  {{if or (.User.Can "export activity log") (.User.Can "import activity log")}}
+  <div class="flex flex-wrap items-end gap-4 rounded-xl border border-zinc-200 px-4 py-3 dark:border-zinc-500">
+    {{if .User.Can "export activity log"}}
+    <form method="get" action="{{.CP}}/activity-log/export" data-turbo="false" class="flex items-end gap-2" x-data="{period:'month'}">
+      <select name="period" x-model="period" class="{{$in}} w-auto"><option value="month">Per month</option><option value="year">Per year</option></select>
+      <input x-show="period==='year'" x-cloak type="number" name="year" value="{{.Year}}" class="{{$in}} w-24">
+      <input x-show="period!=='year'" type="month" name="month" value="{{.Month}}" class="{{$in}}">
+      <button type="submit" class="{{$def}}"><svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>Export</button>
+    </form>
+    {{end}}
+    {{if .User.Can "import activity log"}}
+    <form method="post" action="{{.CP}}/activity-log/restore" enctype="multipart/form-data" data-turbo="false" class="flex items-end gap-2">
+      <input type="file" name="restoreFile" accept="application/json" required class="{{$in}} h-8 py-1 text-xs">
+      <button type="submit" class="{{$ghost}}"><svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>Restore</button>
+    </form>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if .User.IsSuper}}
+  <div class="space-y-3 rounded-xl border border-red-300 px-4 py-3 dark:border-red-900" x-data="{ confirming: false, year: '{{.Year}}' }">
+    <h2 class="text-sm font-semibold text-red-600 dark:text-red-400">Danger zone — permanently delete a year</h2>
+    <p class="text-sm text-zinc-500 dark:text-zinc-400">Superadmin only. Deleting is permanent (hard delete, no undo) and requires confirming a link sent to your email before it actually runs, at 00:00 the following night.</p>
+    <div class="flex items-end gap-2">
+      <input type="number" x-model="year" class="{{$in}} w-28">
+      <button type="button" class="{{$danger}}" @click="confirming = true">Request Delete</button>
+    </div>
+
+    <div x-show="confirming" x-cloak @click.self="confirming = false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <form method="post" action="{{.CP}}/activity-log/delete-request" class="w-full max-w-sm rounded-xl bg-white p-4 dark:bg-zinc-800" @click.stop>
+        <input type="hidden" name="year" :value="year">
+        <h3 class="text-lg font-semibold text-zinc-800 dark:text-white">Are you sure?</h3>
+        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">This will send you a confirmation email for permanently deleting all <span x-text="year"></span> activity log entries. Nothing happens until you click the link in that email.</p>
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" class="{{$ghost}}" @click="confirming = false">Cancel</button>
+          <button type="submit" class="{{$danger}}">Send confirmation email</button>
+        </div>
+      </form>
+    </div>
+
+    {{if .Requests}}
+    <div class="space-y-1 pt-2">
+      {{range .Requests}}<div class="flex items-center gap-2 text-sm">{{template "badge" (dict "Label" .status "Color" (cond (eq .status "confirmed") "amber" "zinc"))}}<span>{{.year}} — requested {{.Ago}}</span></div>{{end}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+
+  <form method="get" action="{{.CP}}/activity-log" x-data @input.debounce.400ms="$el.requestSubmit()" class="flex flex-wrap justify-between gap-3">
+    <div class="relative lg:w-[50%]">
+      <svg class="pointer-events-none absolute left-2.5 top-2 size-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+      <input type="text" name="search" value="{{.F.search}}" placeholder="Search description…" class="{{$in}} pl-8">
+    </div>
+    <select name="action" class="{{$in}} lg:w-[24%]"><option value="">All actions</option>{{$cur := .F.action}}{{range .Actions}}<option value="{{.action}}" {{if eq .action $cur}}selected{{end}}>{{.action}}</option>{{end}}</select>
+    <select name="user_id" class="{{$in}} lg:w-[24%]"><option value="">All users</option>{{$u := .F.user_id}}{{range .Users}}<option value="{{.id}}" {{if eq .id $u}}selected{{end}}>{{.name}}</option>{{end}}</select>
+    <div class="flex items-center gap-2">
+      <input type="date" name="date_from" value="{{.F.date_from}}" class="{{$in}}">
+      <input type="date" name="date_to" value="{{.F.date_to}}" class="{{$in}}">
+    </div>
+  </form>
+
+  {{if .Filtered}}<a href="{{.CP}}/activity-log" class="{{$ghost}}">Clear filters</a>{{end}}
+
+  {{template "card-open"}}<table class="w-full">
+    <thead class="bg-zinc-100 dark:bg-zinc-900"><tr>{{template "th" "When"}}{{template "th" "User"}}{{template "th" "Action"}}{{template "th" "Description"}}{{template "th" ""}}</tr></thead>
+    <tbody>{{range .Rows}}<tr class="{{template "tr-class"}}">
+      <td class="{{template "td-class"}} whitespace-nowrap !text-zinc-500" title="{{.created_at}} UTC">{{.Ago}}</td>
+      <td class="{{template "td-class"}}">{{.user_name}}</td>
+      <td class="{{template "td-class"}}">{{template "badge" (dict "Label" .action "Color" .Color)}}</td>
+      <td class="{{template "td-class"}}">{{.description}}</td>
+      <td class="{{template "td-class"}} text-right">{{if and .Changes ($.User.Can "view activity log detail")}}<button type="button" title="View changes" data-changes="{{.Changes}}" @click="viewing = $el.dataset.changes" class="{{$ghost}} !h-6 !px-1.5">{{template "icon-eye"}}</button>{{end}}</td>
+    </tr>{{else}}<tr><td colspan="5" class="px-3 py-10 text-center text-sm text-zinc-500">No activity recorded yet.</td></tr>{{end}}</tbody>
+  </table>{{template "card-close"}}
+
+  {{if gt .Last 1}}
+  <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-zinc-600 dark:text-zinc-300">
+    <p>Showing <span class="font-medium">{{.From}}</span> to <span class="font-medium">{{.To}}</span> of <span class="font-medium">{{.Total}}</span> results</p>
+    <nav class="inline-flex flex-wrap gap-1">
+      {{if .Prev}}<a href="{{.Prev}}" class="{{$def}}">&laquo; Previous</a>{{end}}
+      {{range .Links}}{{if not .N}}<span class="px-2 py-1">…</span>{{else if .Current}}<span class="{{$btn}} border-zinc-300 bg-zinc-100 dark:border-zinc-500 dark:bg-zinc-600">{{.N}}</span>{{else}}<a href="{{.URL}}" class="{{$def}}">{{.N}}</a>{{end}}{{end}}
+      {{if .Next}}<a href="{{.Next}}" class="{{$def}}">Next &raquo;</a>{{end}}
+    </nav>
+  </div>
+  {{end}}
+
+  <div x-show="viewing" x-cloak @click.self="viewing = null" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-4 dark:bg-zinc-800" @click.stop>
+      <div class="mb-2 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-zinc-800 dark:text-white">Changes</h3>
+        <button type="button" class="{{$ghost}} !px-1.5" @click="viewing = null" aria-label="Close">{{template "icon-x"}}</button>
+      </div>
+      <pre class="overflow-x-auto rounded-lg bg-zinc-100 p-3 text-xs dark:bg-zinc-900" x-text="viewing"></pre>
+    </div>
+  </div>
 </section>
 {{end}}

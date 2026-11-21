@@ -72,6 +72,14 @@ func main() {
 			} else {
 				log.Println("The admin sidebar navigation already exists. Pass -force to reset it back to these defaults.")
 			}
+		case "activity_log": // = php artisan draft:activity_log (tabel sudah dibuat db.Open lewat schema.sql)
+			if err := activitylog.Enable(".env"); err != nil {
+				log.Fatal(err)
+			}
+			log.Println("Activity log enabled. Restart the server to apply.")
+		case "activity_log:process": // = php artisan activity-log:process-deletions
+			e, x := activitylog.Process(app)
+			log.Printf("Dispatched %d deletion(s), expired %d stale request(s).", e, x)
 		case "media:remove":
 			if len(os.Args) < 3 {
 				log.Fatal("usage: media:remove {handle}")

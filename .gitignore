@@ -1,0 +1,2 @@
+# snippet loop editor: digenerate site/plugins/cms-types.mjs dari blueprint tiap `make dev`, jangan di-commit
+.vscode/

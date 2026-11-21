@@ -1,9 +1,10 @@
 // Autocomplete di editor: membaca blueprint dari CMS lalu menulis src/cms.generated.d.ts, jadi `navigation.` menyarankan handle
 // (header, footer, ...), `navigation.header.` menyarankan field blueprint-nya, dan `menu_loop?.map((m) => m.` menyarankan field replicator.
-// Dijalankan saat `astro dev` mulai dan (dibatasi 3 dtk) tiap request dev, jadi blueprint yang baru diubah di admin ikut tanpa restart.
-// Gagal fetch (CMS mati) = file lama dibiarkan. Setelah blueprint berubah, kalau editor belum update: "TypeScript: Restart TS Server".
+// Dijalankan saat `astro dev` mulai lalu dicek ulang tiap 2 dtk (file hanya ditulis bila isinya berubah), jadi blueprint yang baru disimpan di admin
+// (mis. field replicator baru) langsung dapat snippet tanpa restart dan tanpa membuka halaman. Gagal fetch (CMS belum/tidak jalan) = file lama dibiarkan, dicoba lagi. Setelah blueprint berubah, kalau editor belum update: "TypeScript: Restart TS Server".
 // Snippet loop: untuk handle yang berupa list (taxonomy.x, collection.x, field replicator/assets-banyak) ditulis juga .vscode/cms.code-snippets,
 // jadi memilih `taxonomy.breaking_news` di Ctrl+Space langsung jadi `taxonomy.breaking_news?.map((item) => (...))`; bukan list = tidak ada snippet.
+// File snippet di-gitignore: setup awal hanya berisi loop taxonomy, collection (pages), dan navigation yang ada; snippet field replicator baru muncul setelah dibuat di blueprint.
 // shortcut: select/radio bertipe string (bukan union opsi), fieldset bertipe Record<string, any>; rapikan bila perlu.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -40,6 +41,8 @@ function snippets({ navigations, globals, collections, taxonomies, blueprints })
   const out = {};
   for (const r of taxonomies) out[`taxonomy${access(r.handle)}`] = loop(`taxonomy${access(r.handle)}`, `taxonomy${access(r.handle)}`, 'item');
   for (const r of collections) out[`collection${access(r.handle)}`] = loop(`collection${access(r.handle)}`, `collection${access(r.handle)}`, 'item');
+  // Navigation tanpa blueprint = daftar item {title,url,children}, jadi handle-nya sendiri sudah list. sidebar-admin = menu panel admin, bukan untuk site.
+  for (const r of navigations) if (r.handle !== 'sidebar-admin' && !fieldsOf(blueprints, 'navigations', r.handle).length) out[`navigation${access(r.handle)}`] = loop(`navigation${access(r.handle)}`, `navigation${access(r.handle)}`, 'item');
   // Path penuh per modul (cocok saat seluruh `global.global_sidebar.menu_loop` diketik): navigation/global per handle, data.* untuk field entry halaman ini.
   const full = (path, safe) => { out[path] = loop(path, safe, 'item'); };
   const lists = (ns, handle) => fieldsOf(blueprints, ns, handle).filter(isList);
@@ -58,7 +61,7 @@ function snippets({ navigations, globals, collections, taxonomies, blueprints })
 }
 
 async function build(base) {
-  const get = (t) => fetch(`${base}/api/${t}`).then((r) => r.json());
+  const get = (t) => fetch(`${base}/api/${t}`).then((r) => r.json()).then((v) => v ?? []); // tabel kosong = JSON null dari Go
   const [blueprints, navigations, globals, collections, taxonomies] = await Promise.all(['blueprints', 'navigations', 'global_sets', 'collections', 'taxonomies'].map(get));
   const map = (rows, ns, wrap = (s) => s) => `{ ${rows.map((r) => `${key(r.handle)}: ${wrap(shape(blueprints, ns, r.handle))};`).join(' ')} }`;
   const navs = `{ ${navigations.map((r) => `${key(r.handle)}: ${fieldsOf(blueprints, 'navigations', r.handle).length ? shape(blueprints, 'navigations', r.handle) : 'any'};`).join(' ')} }`; // tanpa blueprint = daftar item {title,url,children}
@@ -79,20 +82,29 @@ const SNIPPETS = [new URL('../.vscode/cms.code-snippets', import.meta.url), new 
 const put = async (f, text) => { if (text !== (await readFile(f, 'utf8').catch(() => ''))) await writeFile(f, text); }; // tulis hanya bila berubah: tidak memicu reload TS
 
 export default function cmsTypes(base = process.env.CMS_URL ?? 'http://localhost:8000') {
-  let last = 0;
+  let busy = false, failed = false;
   const sync = async () => {
+    if (busy) return;
+    busy = true;
     try {
       const { code, snippets } = await build(base);
       await put(OUT, code);
       for (const f of SNIPPETS) { await mkdir(new URL('./', f), { recursive: true }); await put(f, snippets); } // folder .vscode: yang dibuka editor (site/ atau root repo) yang terpakai
-    } catch (e) { console.warn(`[cms-types] gagal ambil blueprint dari ${base}: ${e.message}`); }
+      failed = false;
+    } catch (e) {
+      if (!failed) console.warn(`[cms-types] gagal ambil blueprint dari ${base}: ${e.message} (dicoba lagi tiap 2 dtk)`); // sekali per rentetan gagal, bukan tiap polling
+      failed = true;
+    } finally { busy = false; }
   };
   return {
     name: 'cms-types',
     apply: 'serve',
     buildStart: sync,
-    // Blok tanpa return: Vite memanggil nilai kembalian configureServer sebagai post-hook, dan `use()` mengembalikan app Connect.
-    configureServer(s) { s.middlewares.use((_req, _res, next) => { if (Date.now() - last > 3000) { last = Date.now(); sync(); } next(); }); },
+    // Polling, bukan hook request: simpan blueprint di admin tidak menyentuh Astro. Blok tanpa return (nilai kembalian configureServer dianggap post-hook).
+    configureServer(s) {
+      const t = setInterval(sync, 2000);
+      s.httpServer?.on('close', () => clearInterval(t));
+    },
   };
 }
 
