@@ -137,3 +137,9 @@ export const entryPath = async (e: Entry) => {
   const site = (await sites()).find((s) => s.handle === e.site);
   return [new URL(site?.url || '/', 'http://x').pathname, e.uri].join('/').split('/').filter(Boolean).join('/');
 };
+
+// Payload live preview dari Go (route admin): cookie sesi CMS dari request diteruskan, jadi tanpa login = null (404), seperti PreviewController di belakang auth.
+export async function previewPayload(token: string, cookie: string): Promise<Row | null> {
+  const r = await fetch(`${base}/${import.meta.env.CMS_ROUTE ?? 'admin-panel'}/collections/api/preview/${encodeURIComponent(token)}`, { headers: { cookie }, redirect: 'manual' }).catch(() => null);
+  return r?.ok ? r.json() : null;
+}

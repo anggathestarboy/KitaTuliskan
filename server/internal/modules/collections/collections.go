@@ -1,7 +1,7 @@
 // Package collections = app/Modules/Collections: CollectionManager (daftar + modal), EntryManager (daftar/tree entry),
 // EntryForm (form entry), CollectionTreeService, EntryUrlResolver, entries:publish-scheduled, dan SitemapSyncer.
 // UI = React island (resources/ts/collections); data lewat JSON API di /collections/api (lihat API.md).
-// Live preview dan PageController publik tidak ada di sini (dirender Astro).
+// Live preview: state form disimpan di preview.go, dirender Astro (site/src/pages/preview). PageController publik juga di Astro.
 package collections
 
 import (
@@ -172,6 +172,7 @@ func Register(mux *http.ServeMux, a *web.App) {
 	m.registerManager(mux)
 	m.registerEntries(mux)
 	m.registerForm(mux)
+	m.registerPreview(mux)
 	m.startScheduler()
 }
 

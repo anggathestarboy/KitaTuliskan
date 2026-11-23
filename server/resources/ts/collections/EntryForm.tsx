@@ -1,6 +1,6 @@
 // Padanan EntryForm + entry-form.blade.php (+ partials/sidebar-fields): konten (tab → section → field, SEO, Schema) di kiri,
 // panel Save/Cancel + Visit + bahasa + Title/Slug/Parent/Order/Date/Status + tab "sidebar" blueprint di kanan.
-// Semua edit di memori; hanya Save (Ctrl/Cmd+S) yang menyimpan. Live Preview (render template Blade) ada di Astro, bukan di sini.
+// Semua edit di memori; hanya Save (Ctrl/Cmd+S) yang menyimpan. Live Preview: tiap perubahan dikirim ke /api/preview (preview.go); halaman preview dirender Astro.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Asset } from '../media/api';
 import { AssetPicker, type PickerState } from '../navigation/AssetPicker';
@@ -91,6 +91,18 @@ export function EntryForm({ cp, handle, id, site }: { cp: string; handle: string
     addEventListener('keydown', k);
     return () => removeEventListener('keydown', k);
   }, []);
+
+  // Live Preview (= refreshPreviewCache di updated()): state yang belum disimpan dikirim ke server tiap field berubah; halaman preview polling versinya.
+  const previewUrl = cd?.collection.livePreview ? cd.entry.previewUrl : undefined;
+  useEffect(() => {
+    if (!cd || !previewUrl) return;
+    const t = setTimeout(() => {
+      call(`${base}/api/preview/${encodeURIComponent(handle)}/${previewUrl.split('/').pop()}`, {
+        id, site: cd.activeSite, origin: cd.entry.origin ?? '', blueprint: cd.entry.blueprint, title, slug, status, date, order: order === '' ? null : Number(order), data: strip(data),
+      }).catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [data, title, slug, status, date, order]);
 
   if (loadError) return <p className="text-sm font-medium text-red-500 dark:text-red-400">{loadError}</p>;
   if (!cd || !seo) return null;

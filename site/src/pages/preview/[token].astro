@@ -1,0 +1,24 @@
+---
+// = PreviewController::show: render template blueprint dari state form yang belum disimpan (cache di Go), tanpa cek status publish.
+// ?version=1 → {version} untuk polling PreviewBar. Tanpa login CMS / token hilang / live preview mati → 404.
+import Site from '../../layouts/Site.astro';
+import { blueprint, context, entryData, json, previewPayload } from '../../cms';
+
+const views = import.meta.glob('../../views/pages/**/*.astro');
+const payload = await previewPayload(Astro.params.token ?? '', Astro.request.headers.get('cookie') ?? '');
+const template = payload && (json((await blueprint(payload.blueprint))?.data).template as string | undefined);
+const load = template && views[`../../views/${template.replaceAll('.', '/')}.astro`];
+
+if (payload && load && Astro.url.searchParams.get('version')) {
+  return new Response(JSON.stringify({ version: payload.version ?? 0 }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+}
+Astro.response.headers.set('cache-control', 'no-store');
+if (!payload || !load) Astro.response.status = 404;
+let View: any;
+if (payload && load) {
+  View = ((await load()) as { default: any }).default;
+  Object.assign(Astro.locals, await context(payload.site), { entry: payload.attributes, data: await entryData(payload.attributes), previewVersion: payload.version ?? 0 });
+}
+---
+
+{View ? <Site><View /></Site> : <h1>404 Not Found</h1>}

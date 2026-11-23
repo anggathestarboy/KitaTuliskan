@@ -252,6 +252,13 @@ func (m *mod) registerForm(mux *http.ServeMux) {
 			}
 		}
 
+		if c.LivePreview { // = mount(): token baru per muat halaman + payload awal dari state tersimpan
+			tok := newPreviewToken()
+			ent["previewUrl"] = previewURL(tok)
+			str := func(k string) string { s, _ := ent[k].(string); return s }
+			putPreview(tok, previewPayload(c.Handle, ec.bpHandle, ec.site, str("id"), str("origin"), str("status"), str("slug"), str("date"), ent["order"], str("title"), data))
+		}
+
 		out := map[string]any{
 			"item": map[string]any{"handle": c.Handle, "title": c.Title}, "blueprint": ec.b, "sites": links, "activeSite": ec.site, "isOrigin": ec.isOrigin,
 			"data": data, "canEdit": true,

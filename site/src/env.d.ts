@@ -5,6 +5,7 @@ declare namespace App {
   interface Locals extends Ctx {
     entry: Record<string, any>;
     data: Record<string, any>;
+    previewVersion?: number; // diisi pages/preview/[token].astro; ada = halaman live preview
   }
 }
 
