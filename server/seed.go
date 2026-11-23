@@ -51,19 +51,24 @@ func seedContent(a *web.App, siteHandle, siteName string) {
 	blueprint("globals.site_settings", "site_settings", m{"title": "Site Settings", "fields": []m{
 		fld("site_name", "text", "Site name", nil), fld("tagline", "text", "Tagline", nil)}})
 
-	entry := func(slug, uri, bp string, data m) {
-		var n int
-		a.DB.QueryRow(`SELECT COUNT(*) FROM entries WHERE collection='pages' AND slug=?`, slug).Scan(&n)
-		if n > 0 {
-			return
+	// Collection pages structured+orderable: root pertama (order 1, uri "") = homepage, sisanya urut di belakangnya.
+	tree := []structure.Item{}
+	entry := func(slug, uri, bp string, order int, data m) {
+		var id string
+		if a.DB.QueryRow(`SELECT id FROM entries WHERE collection='pages' AND slug=?`, slug).Scan(&id) != nil {
+			id = web.UUID()
+			b, _ := json.Marshal(data)
+			a.DB.Exec("INSERT INTO entries(id,site,published,status,slug,uri,`order`,collection,blueprint,data,created_at,updated_at) VALUES(?,?,1,'published',?,?,?,'pages',?,?,?,?)",
+				id, siteHandle, slug, uri, order, bp, string(b), now, now)
 		}
-		b, _ := json.Marshal(data)
-		a.DB.Exec(`INSERT INTO entries(id,site,published,status,slug,uri,collection,blueprint,data,created_at,updated_at) VALUES(?,?,1,'published',?,?,'pages',?,?,?,?)`,
-			web.UUID(), siteHandle, slug, uri, bp, string(b), now, now)
+		tree = append(tree, structure.Item{ID: id})
 	}
-	entry("home", "/", "homepage", m{"heading": "Welcome to " + siteName, "subheading": "Your new site is up and running. Edit this page from the admin panel.",
+	entry("home", "", "homepage", 1, m{"heading": "Welcome to " + siteName, "subheading": "Your new site is up and running. Edit this page from the admin panel.",
 		"content": "<p>This is example content. Change it in <strong>Collections → Pages → home</strong>.</p>"})
-	entry("about", "/about", "about", m{"title": "About", "content": "<p>Tell visitors who you are. Edit this page in <strong>Collections → Pages → about</strong>.</p>"})
+	entry("about", "about", "about", 2, m{"title": "About", "content": "<p>Tell visitors who you are. Edit this page in <strong>Collections → Pages → about</strong>.</p>"})
+	if len(structure.LoadItems(a.DB, "pages", "collection", siteHandle)) == 0 {
+		structure.SaveItems(a.DB, "pages", "collection", siteHandle, tree)
+	}
 
 	nav := func(handle, title string, rows []m) {
 		a.DB.Exec(`INSERT IGNORE INTO navigations(handle,title,settings,created_at,updated_at) VALUES(?,?,'{"blueprint":null}',?,?)`, handle, title, now, now)

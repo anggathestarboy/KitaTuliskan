@@ -334,6 +334,11 @@ func (m *mod) registerEntries(mux *http.ServeMux) {
 				break
 			}
 		}
+		if err == nil { // order 1 = homepage (uri ""): uri semua entry harus dihitung ulang, kalau tidak Astro masih menyajikan homepage lama
+			for _, e := range all {
+				m.setURI(c, e)
+			}
+		}
 		navigation.Reply(w, nil, err)
 	})
 }

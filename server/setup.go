@@ -34,7 +34,7 @@ func setup(a *web.App, args []string) {
 	}
 	a.DB.Exec(`INSERT IGNORE INTO asset_containers(handle,title,disk,created_at,updated_at) VALUES('assets','Assets','public',?,?)`, now, now)
 	a.DB.Exec(`INSERT IGNORE INTO sites(handle,name,url,locale,lang,attributes,created_at,updated_at) VALUES(?,?,'/','id_ID','id','{}',?,?)`, *siteHandle, *siteName, now, now)
-	a.DB.Exec(`INSERT IGNORE INTO collections(handle,title,settings,created_at,updated_at) VALUES('pages','Pages','{"route":"/{slug}"}',?,?)`, now, now)
+	a.DB.Exec(`INSERT IGNORE INTO collections(handle,title,settings,created_at,updated_at) VALUES('pages','Pages','{"route":"/{slug}","structured":true,"orderable":true}',?,?)`, now, now)
 	seedContent(a, *siteHandle, *siteName)
 	// DB lama menyimpan template "homepage" (bukan nama view) → blueprint tidak bisa disimpan ("selected template is invalid").
 	a.DB.Exec(`UPDATE blueprints SET data=JSON_SET(data,'$.template','pages.static.homepage') WHERE namespace='collections.pages' AND handle='homepage' AND JSON_UNQUOTE(JSON_EXTRACT(data,'$.template'))='homepage'`)

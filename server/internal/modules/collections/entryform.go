@@ -534,6 +534,16 @@ func (m *mod) save(w http.ResponseWriter, r *http.Request, ec *ectx, title, slug
 		}
 	}
 	m.setURI(c, e)
+	// Hanya satu homepage per site: entry lain yang masih order 1 turun ke 2 dan uri-nya dihitung ulang.
+	if c.Orderable && e.Order != nil && *e.Order == 1 {
+		for _, o := range m.entryList("WHERE collection=? AND site=? AND `order`=1 AND id<>?", c.Handle, ec.site, e.ID) {
+			two := 2
+			o.Order = &two
+			if m.update(o) == nil {
+				m.setURI(c, o)
+			}
+		}
+	}
 	m.syncSitemap(e)
 
 	action := "updated"

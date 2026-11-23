@@ -135,7 +135,9 @@ export const formAction = (handle: string) => `${base}/!/forms/${handle}`;
 // Path publik entry = prefix path URL site + entry.uri (uri homepage "" atau "/").
 export const entryPath = async (e: Entry) => {
   const site = (await sites()).find((s) => s.handle === e.site);
-  return [new URL(site?.url || '/', 'http://x').pathname, e.uri].join('/').split('/').filter(Boolean).join('/');
+  // order 1 = homepage (uri ""), apa pun isi kolom uri yang bisa basi; selain itu uri kosong yang basi (bekas homepage) jatuh ke slug.
+  const uri = Number(e.order) === 1 ? '' : (e.uri ?? '').replace(/^\/+$/, '') || e.slug;
+  return [new URL(site?.url || '/', 'http://x').pathname, uri].join('/').split('/').filter(Boolean).join('/');
 };
 
 // Payload live preview dari Go (route admin): cookie sesi CMS dari request diteruskan, jadi tanpa login = null (404), seperti PreviewController di belakang auth.
