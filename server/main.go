@@ -122,6 +122,9 @@ func main() {
 			q += " WHERE status='published'"
 		}
 		rows, _ := web.Rows(d, q)
+		if rows == nil { // tabel kosong harus [] (bukan null), kalau tidak Astro crash di setup baru
+			rows = []map[string]any{}
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(rows)
 	})
