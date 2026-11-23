@@ -790,6 +790,12 @@ func RegisterContent(mux *http.ServeMux, a *web.App, prefix string, src Source) 
 			return
 		}
 		ss := src.Sites(handle)
+		if ss == nil { // nil → JSON null → "Cannot read properties of null (reading 'length')" di form
+			ss = []site{}
+		}
+		if b.Fields == nil {
+			b.Fields = []map[string]any{}
+		}
 		active, origin, isOrigin := resolveSite(ss, r.URL.Query().Get("site"))
 		out := map[string]any{
 			"item":      map[string]any{"handle": handle, "title": title},
