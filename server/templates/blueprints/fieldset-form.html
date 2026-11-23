@@ -16,7 +16,7 @@
     <div class="space-y-3">
       {{template "fe-toolbar" (dict "AddLabel" "Add field" "AddAttrs" (safe `@click="addField('main', '')"`))}}
       {{template "fe-err" "'fields'"}}
-      <div class="min-h-6 space-y-3" @dragover.prevent="hoverTop(null, 'main', '')" @drop.prevent="endDrag()">
+      <div x-flip class="min-h-6 space-y-3" @dragover.prevent="hoverTop(null, 'main', '')" @drop.prevent="endDrag()">
         <template x-for="f0 in fields" :key="f0._uid">
           {{template "field-editor" (dict "Depth" 0 "F" "f0" "S" "fields" "P" "('fields.'+fields.indexOf(f0))" "Top" true "TabX" "'main'" "SecX" "''")}}
         </template>

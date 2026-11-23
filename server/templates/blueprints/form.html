@@ -60,7 +60,7 @@
             </template>
 
             {{/* field tanpa section */}}
-            <div class="min-h-6 space-y-3" @dragover.prevent="hoverTop(null, tab.handle, '')" @drop.prevent="endDrag()">
+            <div x-flip class="min-h-6 space-y-3" @dragover.prevent="hoverTop(null, tab.handle, '')" @drop.prevent="endDrag()">
               <template x-for="f0 in groupFields(tab.handle, '')" :key="f0._uid">
                 {{template "field-editor" (dict "Depth" 0 "F" "f0" "S" "fields" "P" "('fields.'+fields.indexOf(f0))" "Top" true "TabX" "tab.handle" "SecX" "''")}}
               </template>

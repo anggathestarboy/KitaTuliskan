@@ -16,10 +16,10 @@
 
 {{/* field-editor: dict Depth F(nama var Alpine field) S(ekspresi array sibling) P(ekspresi prefix error) Top(bool) TabX SecX(ekspresi tab/section grup, hanya Top) */}}
 {{define "field-editor"}}{{$f := .F}}{{$s := .S}}{{$p := .P}}{{$d := .Depth}}
-<div :draggable="armed==={{$f}}._uid" @dragstart.stop="dragStart($event, {{$s}}, {{$f}})" @dragend="endDrag()" @dragover.prevent.stop="{{if .Top}}hoverTop({{$f}}, {{.TabX}}, {{.SecX}}, $event){{else}}hoverSub({{$s}}, {{$f}}, $event){{end}}" @drop.prevent.stop="endDrag()"
-  :class="drag && drag.uid==={{$f}}._uid ? 'opacity-40' : ''" class="rounded-lg border border-gray-200 bg-gray-100 px-1.5 py-1 transition-opacity dark:border-zinc-600 dark:bg-zinc-800">
+<div data-field @dragover.prevent.stop="{{if .Top}}hoverTop({{$f}}, {{.TabX}}, {{.SecX}}, $event){{else}}hoverSub({{$s}}, {{$f}}, $event){{end}}" @drop.prevent.stop="endDrag()"
+  :class="drag && drag.uid==={{$f}}._uid ? 'opacity-95' : ''" class="rounded-lg border border-gray-200 bg-gray-100 px-1.5 py-1 dark:border-zinc-600 dark:bg-zinc-800">
   <div class="flex w-full items-center justify-between gap-1 rounded-lg">
-    <span @mousedown="armed={{$f}}._uid" @mouseup="armed=null" class="flex h-full cursor-grab items-center px-1 text-zinc-400 hover:text-zinc-600 active:cursor-grabbing dark:hover:text-zinc-300" title="Drag to reorder">{{template "icon-grip"}}</span>
+    <span @pointerdown.prevent="dragStart($event, {{$s}}, {{$f}})" class="flex h-full cursor-grab touch-none items-center px-1 text-zinc-400 hover:text-zinc-600 active:cursor-grabbing dark:hover:text-zinc-300" title="Drag to reorder">{{template "icon-grip"}}</span>
     <p class="flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-x-1.5 self-center break-words rounded-md px-3 py-1.5 text-sm font-medium hover:bg-black/5" @click="{{$f}}._c = !{{$f}}._c">
       <span x-text="title({{$f}})"></span><span class="text-xs text-zinc-400" x-text="'(' + typeLabel({{$f}}.type) + ')'"></span>
     </p>
@@ -156,7 +156,7 @@
       <div class="mt-3 space-y-2 rounded-md border border-dashed border-zinc-300 p-3 dark:border-zinc-600">
         <div class="flex items-center justify-between"><p class="text-xs font-medium text-zinc-500">Replicator fields</p>{{template "button" (dict "Label" "Add field" "Size" "sm" "Attrs" (safe (print `@click="addSub(` $f `)"`)))}}</div>
         {{template "fe-err" (print $p "+'.replicator_fields'")}}
-        <div class="min-h-6 space-y-2" @dragover.prevent="hoverSub({{$f}}.replicator_fields, null)" @drop.prevent="endDrag()">
+        <div x-flip class="min-h-6 space-y-2" @dragover.prevent="hoverSub({{$f}}.replicator_fields, null)" @drop.prevent="endDrag()">
           <template x-for="{{print "f" (inc $d)}} in {{$f}}.replicator_fields" :key="{{print "f" (inc $d)}}._uid">
             {{template "field-editor" (dict "Depth" (inc $d) "F" (print "f" (inc $d)) "S" (print $f ".replicator_fields") "P" (print "(" $p "+'.replicator_fields.'+" $f ".replicator_fields.indexOf(f" (inc $d) "))") "Top" false)}}
           </template>
@@ -214,7 +214,8 @@ window.fieldBuilder = function (st, lk, ed, extra) {
     groupFields(tab, section) { return this.fields.filter(f => (f.tab || 'main') === tab && (f.section || '') === section); },
     slug(s) { return (s || '').toLowerCase().replace(/[^a-z\s_]/g, '').trim().replace(/\s+/g, '_').replace(/_+/g, '_'); },
     // ---- drag & drop (pengganti wire:sort) ----
-    dragStart(e, list, f) { this.drag = {list, uid: f._uid}; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', f._uid); }, // setData wajib agar Firefox memulai drag
+    // Drag berbasis pointer (item ikut kursor, seperti dnd-kit di navigations): pointerSort mengirim 'dragover' sintetis ke elemen di bawah kursor, jadi hoverTop/hoverSub tetap dipakai.
+    dragStart(e, list, f) { this.drag = {list, uid: f._uid}; window.pointerSort(e, e.currentTarget.closest('[data-field]'), () => this.endDrag()); },
     endDrag() { this.drag = null; this.armed = null; this.dragSec = null; },
     // Reorder terjadi saat dragover (live, seperti Sortable), bukan saat drop: target = item yang dilewati, null = area kosong/akhir list.
     // pastMid: hanya tukar posisi setelah pointer melewati tengah target searah gerak, supaya tidak bolak-balik saat tinggi item berbeda.
