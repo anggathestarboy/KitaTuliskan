@@ -110,6 +110,15 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(media.PublicAssets(app))
 	})
+	// Nama author (meta_author = id user) untuk Astro. Hanya id+name, dan hanya user yang menjadi author entry published: tabel users tidak boleh terbuka penuh.
+	mux.HandleFunc("GET /api/authors", func(w http.ResponseWriter, r *http.Request) {
+		rows, _ := web.Rows(d, `SELECT DISTINCT u.id, u.name FROM users u JOIN entries e ON e.status='published' AND JSON_UNQUOTE(JSON_EXTRACT(e.seo,'$.meta_author')) COLLATE utf8mb4_unicode_ci = u.id COLLATE utf8mb4_unicode_ci`)
+		if rows == nil {
+			rows = []map[string]any{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(rows)
+	})
 	// JSON publik untuk Astro (PageController + Blade directives di source diganti fetch saat build).
 	mux.HandleFunc("GET /api/{table}", func(w http.ResponseWriter, r *http.Request) {
 		t := r.PathValue("table")

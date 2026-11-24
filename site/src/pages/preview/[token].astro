@@ -2,7 +2,7 @@
 // = PreviewController::show: render template blueprint dari state form yang belum disimpan (cache di Go), tanpa cek status publish.
 // ?version=1 → {version} untuk polling PreviewBar. Tanpa login CMS / token hilang / live preview mati → 404.
 import Site from '../../layouts/Site.astro';
-import { blueprint, context, entryData, json, previewPayload } from '../../cms';
+import { blueprint, context, entryData, entrySeo, json, previewPayload } from '../../cms';
 
 const views = import.meta.glob('../../views/pages/**/*.astro');
 const payload = await previewPayload(Astro.params.token ?? '', Astro.request.headers.get('cookie') ?? '');
@@ -17,7 +17,7 @@ if (!payload || !load) Astro.response.status = 404;
 let View: any;
 if (payload && load) {
   View = ((await load()) as { default: any }).default;
-  Object.assign(Astro.locals, await context(payload.site), { entry: payload.attributes, data: await entryData(payload.attributes), previewVersion: payload.version ?? 0 });
+  Object.assign(Astro.locals, await context(payload.site), { entry: { ...payload.attributes, seo: await entrySeo(payload.attributes) }, data: await entryData(payload.attributes), previewVersion: payload.version ?? 0 });
 }
 ---
 

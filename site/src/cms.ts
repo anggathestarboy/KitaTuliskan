@@ -76,9 +76,17 @@ async function resolveAssets(data: Row, fields: Row[]): Promise<Row> {
 // data entry siap pakai di template: JSON ter-parse + field assets ter-resolve.
 export const entryData = async (e: Row): Promise<Row> => resolveAssets(json(e.data), json((await blueprint(e.blueprint))?.data).fields ?? []);
 
+// SEO tools entry (kolom seo): objek siap pakai, meta_featured_image di-resolve jadi satu objek asset (atau null). Juga diratakan ke item collection: item.meta_title.
+// meta_author (id user) diganti nama dari /api/authors; id aslinya di meta_author_id.
+export const entrySeo = async (e: Row): Promise<Row> => {
+  const seo = await resolveAssets(json(e.seo), [{ handle: 'meta_featured_image', type: 'assets', max_items: 1 }]);
+  const id = seo.meta_author ?? '';
+  return { ...seo, meta_author: id ? ((await api('authors')) as Row[]).find((a) => a.id === id)?.name ?? '' : '', meta_author_id: id };
+};
+
 // @collection: hanya entry published (/api/entries sudah memfilternya).
 export async function collection(handle: string, o: Options = {}): Promise<Entry[]> {
-  let rows = await Promise.all((await api('entries')).filter((e) => e.collection === handle).map(async (e) => { const data = await entryData(e); return { ...data, ...e, url: '/' + (await entryPath(e)), data }; })); // field data diratakan: e.title (kolom menang bila bentrok), e.data.title tetap ada
+  let rows = await Promise.all((await api('entries')).filter((e) => e.collection === handle).map(async (e) => { const data = await entryData(e), seo = await entrySeo(e); return { ...seo, ...data, ...e, seo, url: '/' + (await entryPath(e)), data }; })); // field data & seo diratakan: e.title / e.meta_title (kolom menang bila bentrok), e.data.title dan e.seo.meta_title tetap ada
   if (o.related) {
     const rel = typeof o.related === 'string' ? rows.find((e) => e.id === o.related) : o.related;
     const taxFields = json((await blueprint(rel?.blueprint))?.data).fields?.filter((f: Row) => f.type === 'taxonomy').map((f: Row) => f.handle) ?? [];
