@@ -17,7 +17,8 @@ function fieldType(f) {
   switch (f.type) {
     case 'number': return 'number';
     case 'toggle': return 'boolean';
-    case 'checkbox': case 'taxonomy': return 'string[]';
+    case 'checkbox': return 'string[]';
+    case 'taxonomy': return f.max_items == null || f.max_items > 1 ? 'CmsTerm[]' : 'CmsTerm | null';
     case 'assets': return f.max_items == null || f.max_items > 1 ? 'CmsAsset[]' : 'CmsAsset | null';
     case 'replicator': return `Array<{ ${props(f.replicator_fields)} }>`;
     case 'fieldset': return 'Record<string, any>';
@@ -66,6 +67,7 @@ async function build(base) {
   const map = (rows, ns, wrap = (s) => s) => `{ ${rows.map((r) => `${key(r.handle)}: ${wrap(shape(blueprints, ns, r.handle))};`).join(' ')} }`;
   const navs = `{ ${navigations.map((r) => `${key(r.handle)}: ${fieldsOf(blueprints, 'navigations', r.handle).length ? shape(blueprints, 'navigations', r.handle) : 'any'};`).join(' ')} }`; // tanpa blueprint = daftar item {title,url,children}
   const code = `// DIGENERATE oleh plugins/cms-types.mjs dari blueprint CMS. Jangan diedit.
+interface CmsTerm { id: string; title?: string; slug?: string; taxonomy: string; data: Record<string, any>; [k: string]: any }
 interface CmsAsset { url: string; alt?: string; width?: number; height?: number; loading?: string; title?: string; mime_type?: string; [k: string]: any }
 type CmsEntry<T> = import('./cms').Entry & T & { url: string; data: T };
 declare namespace Cms {

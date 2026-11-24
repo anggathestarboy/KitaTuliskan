@@ -49,14 +49,20 @@ const originSite = async () => (await sites())[0]?.handle;
 export const blueprint = async (handle: string) => (await api('blueprints')).find((b) => b.handle === handle);
 const fieldsOf = async (ns: string) => json((await api('blueprints')).find((b) => b.namespace === ns)?.data).fields ?? [];
 
-// = resolveAssetFields: id asset → objek asset, rekursif ke dalam replicator.
+// term taxonomy siap pakai: field data diratakan (t.title), t.data tetap ada.
+const term = (t: Row): Row => { const data = live(json(t.data)); return { ...data, ...t, data }; };
+
+// = resolveAssetFields: id asset / term taxonomy → objek, rekursif ke dalam replicator (max_items 1 → satu objek, selain itu array).
 async function resolveAssets(data: Row, fields: Row[]): Promise<Row> {
-  const assets = (await api('assets')) as Row[];
+  const assets = (await api('assets')) as Row[], terms = (await api('taxonomy_terms')) as Row[];
   const walk = (d: Row, fs: Row[]): Row => {
     d = { ...d };
     for (const f of fs) {
       if (f.type === 'replicator') d[f.handle] = ([d[f.handle] ?? []].flat() as Row[]).map((row) => walk(row, f.replicator_fields ?? []));
-      else if (f.type === 'assets') {
+      else if (f.type === 'taxonomy') {
+        const found = [d[f.handle] ?? []].flat().map((id: unknown) => terms.find((t) => String(t.id) === String(id))).filter(Boolean).map((t) => term(t!));
+        d[f.handle] = f.max_items == null || f.max_items > 1 ? found : found[0] ?? null;
+      } else if (f.type === 'assets') {
         const ids = (Array.isArray(d[f.handle]) ? d[f.handle] : []).map(Number);
         const found = ids.map((id: number) => assets.find((a) => a.id === id)).filter(Boolean);
         d[f.handle] = f.max_items == null || f.max_items > 1 ? found : found[0] ?? null;
@@ -76,14 +82,15 @@ export async function collection(handle: string, o: Options = {}): Promise<Entry
   if (o.related) {
     const rel = typeof o.related === 'string' ? rows.find((e) => e.id === o.related) : o.related;
     const taxFields = json((await blueprint(rel?.blueprint))?.data).fields?.filter((f: Row) => f.type === 'taxonomy').map((f: Row) => f.handle) ?? [];
-    const ids = new Set(taxFields.flatMap((h: string) => [rel?.data?.[h] ?? []].flat()));
-    rows = rows.filter((e) => e.id !== rel?.id && taxFields.some((h: string) => [e.data[h] ?? []].flat().some((t: unknown) => ids.has(t))));
+    const idOf = (t: any) => String(t?.id ?? t);
+    const ids = new Set(taxFields.flatMap((h: string) => [rel?.data?.[h] ?? []].flat().map(idOf)));
+    rows = rows.filter((e) => e.id !== rel?.id && taxFields.some((h: string) => [e.data[h] ?? []].flat().some((t: unknown) => ids.has(idOf(t)))));
   }
   return query(rows, { ...o, sort: o.random || o.sort ? o.sort : ['order', 'date:desc'] }) as Entry[];
 }
 
 export async function taxonomy(handle: string, o: Options = {}): Promise<Row[]> {
-  return query((await api('taxonomy_terms')).filter((t) => t.taxonomy === handle).map((t) => { const data = live(json(t.data)); return { ...data, ...t, data }; }), o); // diratakan: t.title / t.news_label, t.data.title tetap ada
+  return query((await api('taxonomy_terms')).filter((t) => t.taxonomy === handle).map((t) => { return term(t); }), o); // diratakan: t.title / t.news_label, t.data.title tetap ada
 }
 
 // @global: field non-localizable selalu dari site asal; localizable/replicator memakai nilai site sendiri bila terisi.
@@ -141,6 +148,12 @@ export const entryPath = async (e: Entry) => {
   // order 1 = homepage (uri ""), apa pun isi kolom uri yang bisa basi; selain itu uri kosong yang basi (bekas homepage) jatuh ke slug.
   const uri = Number(e.order) === 1 ? '' : (e.uri ?? '').replace(/^\/+$/, '') || e.slug;
   return [new URL(site?.url || '/', 'http://x').pathname, uri].join('/').split('/').filter(Boolean).join('/');
+};
+
+// Versi bahasa entry yang sudah published (satu origin-family: origin_id ?? id), termasuk entry itu sendiri → [{ site, path }].
+export const translations = async (e: Row) => {
+  const key = e.origin_id ?? e.id;
+  return Promise.all(((await api('entries')) as Row[]).filter((x) => (x.origin_id ?? x.id) === key).map(async (x) => ({ site: x.site as string, path: '/' + (await entryPath(x as Entry)) })));
 };
 
 // Payload live preview dari Go (route admin): cookie sesi CMS dari request diteruskan, jadi tanpa login = null (404), seperti PreviewController di belakang auth.
