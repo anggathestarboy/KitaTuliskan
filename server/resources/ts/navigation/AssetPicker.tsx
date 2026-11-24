@@ -1,7 +1,9 @@
 // Padanan media::asset-picker (modal "Select assets"): breadcrumb, cari, grid folder/file, strip terpilih, "Use selected".
-// shortcut: tanpa tombol Upload + kompresi di dalam picker; unggah lewat Media Library, lalu pilih di sini.
-import { useEffect, useState } from 'react';
-import { type Asset, type Folder, type Listing } from '../media/api';
+// Upload langsung di dalam picker (alur sama dengan Media Library: >800 KB menunggu slider kompresi).
+import { useEffect, useRef, useState } from 'react';
+import { type Asset, type Compression, type Folder, type Listing, type Progress, client, needsCompression } from '../media/api';
+import { Compress } from '../media/Compress';
+import { UploadProgress } from '../media/Progress';
 import { Thumbnail } from '../media/items';
 import { Button, FolderIcon, Icon, Input, MiniIcon, Modal, cn } from '../shared/ui';
 
@@ -22,16 +24,46 @@ export function AssetPicker({ cp, state, onClose }: { cp: string; state: PickerS
   const [search, setSearch] = useState('');
   const [list, setList] = useState<{ folders: Folder[]; files: Asset[] }>({ folders: [], files: [] });
   const [msg, setMsg] = useState('');
+  const [meta, setMeta] = useState<{ compression?: Compression; canUpload: boolean }>({ canUpload: false });
+  const [reloadKey, setReloadKey] = useState(0);
+  const [pending, setPending] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (state) { setPicked(state.selected); setPath(''); setSearch(''); setMsg(''); } }, [state]);
   useEffect(() => {
     if (!state) return;
     const t = setTimeout(() => {
       const q = new URLSearchParams({ container: state.container, path, search });
-      fetch(`${cp}/media/api/listing?${q}`).then((r) => r.json()).then((d: Listing & { error?: string }) => (d.error ? setMsg(d.error) : setList({ folders: d.folders ?? [], files: d.files ?? [] }))).catch(() => setMsg('Something went wrong.'));
+      fetch(`${cp}/media/api/listing?${q}`).then((r) => r.json()).then((d: Listing & { error?: string }) => (d.error ? setMsg(d.error) : (setList({ folders: d.folders ?? [], files: d.files ?? [] }), setMeta({ compression: d.compression, canUpload: !!d.can?.upload })))).catch(() => setMsg('Something went wrong.'));
     }, search ? 300 : 0);
     return () => clearTimeout(t);
-  }, [state, path, search, cp]);
+  }, [state, path, search, cp, reloadKey]);
+
+  // send = satu kali kirim; level kosong = batas default 800 KB. Kegagalan tampil di msg picker.
+  const send = async (files: File[], level?: number) => {
+    setProgress({ phase: 'upload', pct: 0 });
+    try {
+      const r = await client(cp).upload(state!.container, path, files, setProgress, level);
+      setMsg(r.failures.join(' '));
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Upload failed.'); }
+    setProgress(null);
+    setReloadKey((k) => k + 1);
+  };
+  const upload = async (files: File[]) => {
+    if (!files.length) return;
+    const big = meta.compression?.enabled ? files.filter(needsCompression) : [];
+    const now = files.filter((f) => !big.includes(f));
+    if (now.length) await send(now);
+    if (big.length) setPending(big);
+  };
+  const confirmCompress = async (level: number) => {
+    setBusy(true);
+    await send(pending, level);
+    setBusy(false);
+    setPending([]);
+  };
 
   const sel = (id: number) => picked.some((a) => a.id === id);
   const toggle = (a: Asset) => {
@@ -101,13 +133,25 @@ export function AssetPicker({ cp, state, onClose }: { cp: string; state: PickerS
         </div>
       </div>
 
+      {progress && !busy && <UploadProgress p={progress} />}
       {msg && <p className="text-sm text-red-500">{msg}</p>}
 
-      <div className="flex items-center justify-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
-        <span className="text-sm text-zinc-500 dark:text-white/70">{picked.length} selected</span>
-        <Button variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" onClick={() => { state!.ok(picked.map((a) => a.id), picked); onClose(); }}>Use selected</Button>
+      <div className="flex items-center justify-between gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+        <div>
+          {meta.canUpload && (
+            <>
+              <input ref={fileInput} type="file" multiple className="hidden" onChange={(e) => { upload([...(e.target.files ?? [])]); e.target.value = ''; }} />
+              <Button icon="arrow-up-tray" disabled={!!progress} onClick={() => fileInput.current?.click()}>{progress ? 'Uploading...' : 'Upload'}</Button>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-zinc-500 dark:text-white/70">{picked.length} selected</span>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={() => { state!.ok(picked.map((a) => a.id), picked); onClose(); }}>Use selected</Button>
+        </div>
       </div>
+      {pending.length > 0 && meta.compression && <Compress files={pending} cfg={meta.compression} busy={busy} progress={progress} onCancel={() => setPending([])} onConfirm={confirmCompress} />}
     </Modal>
   );
 }
