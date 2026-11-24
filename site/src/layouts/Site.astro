@@ -6,7 +6,7 @@ import Footer from '../components/Footer.astro';
 import PreviewBar from '../components/PreviewBar.astro';
 import { json } from '../cms';
 import '../styles/global.css';
-const { site, data, entry, global, previewVersion } = Astro.locals;
+const { previewVersion } = Astro.locals;
 const title = json(entry.seo).meta_title || data.heading || data.title || global.site_settings?.site_name || site?.name || 'Draft CMS Lite';
 ---
 

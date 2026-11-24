@@ -21,6 +21,9 @@ export const api = (table: string) => {
   return rows;
 };
 export const json = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v ?? {});
+// = Entry::dropDisabledRows di source: baris replicator dengan _enabled off dibuang (rekursif, semua modul) dan key _enabled-nya dihapus,
+// jadi template tidak perlu menyaring sendiri. Baris tanpa _enabled dianggap aktif.
+const live = (v: any): any => Array.isArray(v) ? v.filter((r) => r?._enabled ?? true).map(live) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([k]) => k !== '_enabled').map(([k, x]) => [k, live(x)])) : v;
 
 export type Entry = Row & { id: string; site: string; slug: string; uri: string; collection: string; blueprint: string; data: Row };
 type Options = { site?: string; where?: Row; sort?: string | string[]; random?: boolean; limit?: number; related?: Entry | string };
@@ -61,7 +64,7 @@ async function resolveAssets(data: Row, fields: Row[]): Promise<Row> {
     }
     return d;
   };
-  return walk(data, fields);
+  return walk(live(data), fields);
 }
 
 // data entry siap pakai di template: JSON ter-parse + field assets ter-resolve.
@@ -80,7 +83,7 @@ export async function collection(handle: string, o: Options = {}): Promise<Entry
 }
 
 export async function taxonomy(handle: string, o: Options = {}): Promise<Row[]> {
-  return query((await api('taxonomy_terms')).filter((t) => t.taxonomy === handle).map((t) => { const data = json(t.data); return { ...data, ...t, data }; }), o); // diratakan: t.title / t.news_label, t.data.title tetap ada
+  return query((await api('taxonomy_terms')).filter((t) => t.taxonomy === handle).map((t) => { const data = live(json(t.data)); return { ...data, ...t, data }; }), o); // diratakan: t.title / t.news_label, t.data.title tetap ada
 }
 
 // @global: field non-localizable selalu dari site asal; localizable/replicator memakai nilai site sendiri bila terisi.

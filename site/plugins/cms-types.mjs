@@ -19,7 +19,7 @@ function fieldType(f) {
     case 'toggle': return 'boolean';
     case 'checkbox': case 'taxonomy': return 'string[]';
     case 'assets': return f.max_items == null || f.max_items > 1 ? 'CmsAsset[]' : 'CmsAsset | null';
-    case 'replicator': return `Array<{ _enabled?: boolean; ${props(f.replicator_fields)} }>`;
+    case 'replicator': return `Array<{ ${props(f.replicator_fields)} }>`;
     case 'fieldset': return 'Record<string, any>';
     default: return 'string'; // text, textarea, markdown, bard, date, select, radio, link, author
   }

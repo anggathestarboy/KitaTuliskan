@@ -1,6 +1,5 @@
 ---
-const { site, sites, global, navigation } = Astro.locals;
-const items: any[] = (navigation.footer?.menu_loop ?? []).filter((m: any) => m._enabled);
+const items: any[] = (navigation.footer?.menu_loop ?? []);
 ---
 
 <footer class="flex flex-wrap justify-between gap-4 border-t border-gray-200 p-6 text-sm text-gray-500">
