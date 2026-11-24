@@ -1,5 +1,5 @@
-<main style="max-width:40rem;margin:4rem auto;padding:0 1rem">
-   <h1>{data.heading}</h1>
+<main class="mx-auto my-16 max-w-2xl px-4">
+   <h1 class="text-3xl font-bold">{data.heading}</h1>
    {data.subheading && <p>{data.subheading}</p>}
    <div set:html={data.content} />
 </main>
