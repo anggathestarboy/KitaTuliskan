@@ -67,9 +67,10 @@ async function build(base) {
   const map = (rows, ns, wrap = (s) => s) => `{ ${rows.map((r) => `${key(r.handle)}: ${wrap(shape(blueprints, ns, r.handle))};`).join(' ')} }`;
   const navs = `{ ${navigations.map((r) => `${key(r.handle)}: ${fieldsOf(blueprints, 'navigations', r.handle).length ? shape(blueprints, 'navigations', r.handle) : 'any'};`).join(' ')} }`; // tanpa blueprint = daftar item {title,url,children}
   const code = `// DIGENERATE oleh plugins/cms-types.mjs dari blueprint CMS. Jangan diedit.
+interface CmsSeo { meta_title?: string; meta_description?: string; meta_canonical?: string; robots?: string[]; meta_featured_image?: CmsAsset | null; meta_author?: string; meta_author_id?: string; sitemap_priority?: string; sitemap_changefreq?: string }
 interface CmsTerm { id: string; title?: string; slug?: string; taxonomy: string; data: Record<string, any>; [k: string]: any }
 interface CmsAsset { url: string; alt?: string; width?: number; height?: number; loading?: string; title?: string; mime_type?: string; [k: string]: any }
-type CmsEntry<T> = import('./cms').Entry & T & { url: string; data: T };
+type CmsEntry<T> = import('./cms').Entry & CmsSeo & T & { url: string; data: T; seo: CmsSeo };
 declare namespace Cms {
   type Navigation = ${navs};
   type Global = ${map(globals, 'globals')};
