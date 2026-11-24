@@ -1,1 +1,164 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif&family=Source+Code+Pro&display=swap");
 @import "tailwindcss";
+
+@theme {
+  --font-heading: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-paragraph: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-heading-64: 64px;
+  --leading-heading-64: 1.1;
+  --text-heading-56: 56px;
+  --leading-heading-56: 1.1;
+  --text-heading-48: 48px;
+  --leading-heading-48: 1.15;
+  --text-heading-44: 44px;
+  --leading-heading-44: 1.15;
+  --text-heading-40: 40px;
+  --leading-heading-40: 1.15;
+  --text-heading-36: 36px;
+  --leading-heading-36: 1.2;
+  --text-heading-32: 32px;
+  --leading-heading-32: 1.2;
+  --text-heading-28: 28px;
+  --leading-heading-28: 1.25;
+  --text-heading-24: 24px;
+  --leading-heading-24: 1.25;
+  --text-heading-20: 20px;
+  --leading-heading-20: 1.3;
+  --text-heading-18: 18px;
+  --leading-heading-18: 1.35;
+  --text-heading-16: 16px;
+  --leading-heading-16: 1.4;
+  --text-paragraph-20: 20px;
+  --leading-paragraph-20: 1.5;
+  --text-paragraph-18: 18px;
+  --leading-paragraph-18: 1.55;
+  --text-paragraph-16: 16px;
+  --leading-paragraph-16: 1.6;
+  --text-paragraph-15: 15px;
+  --leading-paragraph-15: 1.6;
+  --text-paragraph-14: 14px;
+  --leading-paragraph-14: 1.55;
+  --text-paragraph-12: 12px;
+  --leading-paragraph-12: 1.5;
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --text-heading-64: 52px;
+    --text-heading-56: 46px;
+    --text-heading-48: 40px;
+    --text-heading-44: 36px;
+    --text-heading-40: 34px;
+    --text-heading-36: 30px;
+    --text-heading-32: 28px;
+    --text-heading-28: 24px;
+    --text-heading-24: 22px;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --text-heading-64: 40px;
+    --text-heading-56: 36px;
+    --text-heading-48: 32px;
+    --text-heading-44: 30px;
+    --text-heading-40: 28px;
+    --text-heading-36: 26px;
+    --text-heading-32: 24px;
+    --text-heading-28: 22px;
+    --text-heading-24: 20px;
+    --text-heading-20: 18px;
+    --text-heading-18: 16px;
+    --text-paragraph-20: 18px;
+    --text-paragraph-18: 16px;
+  }
+}
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+  @media (width >= 96rem) {
+    max-width: 80rem;
+  }
+}
+
+@layer base {
+  body { font-family: var(--font-paragraph); font-weight: 400; }
+  h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); font-weight: 400; }
+  code, kbd, samp, pre { font-family: var(--font-mono); font-weight: 400; }
+}
+
+@utility heading-64 { font-family: var(--font-heading); font-size: var(--text-heading-64); line-height: var(--leading-heading-64); font-weight: 400; }
+@utility heading-64-medium { font-family: var(--font-heading); font-size: var(--text-heading-64); line-height: var(--leading-heading-64); font-weight: 500; }
+@utility heading-64-semibold { font-family: var(--font-heading); font-size: var(--text-heading-64); line-height: var(--leading-heading-64); font-weight: 600; }
+@utility heading-64-bold { font-family: var(--font-heading); font-size: var(--text-heading-64); line-height: var(--leading-heading-64); font-weight: 700; }
+@utility heading-56 { font-family: var(--font-heading); font-size: var(--text-heading-56); line-height: var(--leading-heading-56); font-weight: 400; }
+@utility heading-56-medium { font-family: var(--font-heading); font-size: var(--text-heading-56); line-height: var(--leading-heading-56); font-weight: 500; }
+@utility heading-56-semibold { font-family: var(--font-heading); font-size: var(--text-heading-56); line-height: var(--leading-heading-56); font-weight: 600; }
+@utility heading-56-bold { font-family: var(--font-heading); font-size: var(--text-heading-56); line-height: var(--leading-heading-56); font-weight: 700; }
+@utility heading-48 { font-family: var(--font-heading); font-size: var(--text-heading-48); line-height: var(--leading-heading-48); font-weight: 400; }
+@utility heading-48-medium { font-family: var(--font-heading); font-size: var(--text-heading-48); line-height: var(--leading-heading-48); font-weight: 500; }
+@utility heading-48-semibold { font-family: var(--font-heading); font-size: var(--text-heading-48); line-height: var(--leading-heading-48); font-weight: 600; }
+@utility heading-48-bold { font-family: var(--font-heading); font-size: var(--text-heading-48); line-height: var(--leading-heading-48); font-weight: 700; }
+@utility heading-44 { font-family: var(--font-heading); font-size: var(--text-heading-44); line-height: var(--leading-heading-44); font-weight: 400; }
+@utility heading-44-medium { font-family: var(--font-heading); font-size: var(--text-heading-44); line-height: var(--leading-heading-44); font-weight: 500; }
+@utility heading-44-semibold { font-family: var(--font-heading); font-size: var(--text-heading-44); line-height: var(--leading-heading-44); font-weight: 600; }
+@utility heading-44-bold { font-family: var(--font-heading); font-size: var(--text-heading-44); line-height: var(--leading-heading-44); font-weight: 700; }
+@utility heading-40 { font-family: var(--font-heading); font-size: var(--text-heading-40); line-height: var(--leading-heading-40); font-weight: 400; }
+@utility heading-40-medium { font-family: var(--font-heading); font-size: var(--text-heading-40); line-height: var(--leading-heading-40); font-weight: 500; }
+@utility heading-40-semibold { font-family: var(--font-heading); font-size: var(--text-heading-40); line-height: var(--leading-heading-40); font-weight: 600; }
+@utility heading-40-bold { font-family: var(--font-heading); font-size: var(--text-heading-40); line-height: var(--leading-heading-40); font-weight: 700; }
+@utility heading-36 { font-family: var(--font-heading); font-size: var(--text-heading-36); line-height: var(--leading-heading-36); font-weight: 400; }
+@utility heading-36-medium { font-family: var(--font-heading); font-size: var(--text-heading-36); line-height: var(--leading-heading-36); font-weight: 500; }
+@utility heading-36-semibold { font-family: var(--font-heading); font-size: var(--text-heading-36); line-height: var(--leading-heading-36); font-weight: 600; }
+@utility heading-36-bold { font-family: var(--font-heading); font-size: var(--text-heading-36); line-height: var(--leading-heading-36); font-weight: 700; }
+@utility heading-32 { font-family: var(--font-heading); font-size: var(--text-heading-32); line-height: var(--leading-heading-32); font-weight: 400; }
+@utility heading-32-medium { font-family: var(--font-heading); font-size: var(--text-heading-32); line-height: var(--leading-heading-32); font-weight: 500; }
+@utility heading-32-semibold { font-family: var(--font-heading); font-size: var(--text-heading-32); line-height: var(--leading-heading-32); font-weight: 600; }
+@utility heading-32-bold { font-family: var(--font-heading); font-size: var(--text-heading-32); line-height: var(--leading-heading-32); font-weight: 700; }
+@utility heading-28 { font-family: var(--font-heading); font-size: var(--text-heading-28); line-height: var(--leading-heading-28); font-weight: 400; }
+@utility heading-28-medium { font-family: var(--font-heading); font-size: var(--text-heading-28); line-height: var(--leading-heading-28); font-weight: 500; }
+@utility heading-28-semibold { font-family: var(--font-heading); font-size: var(--text-heading-28); line-height: var(--leading-heading-28); font-weight: 600; }
+@utility heading-28-bold { font-family: var(--font-heading); font-size: var(--text-heading-28); line-height: var(--leading-heading-28); font-weight: 700; }
+@utility heading-24 { font-family: var(--font-heading); font-size: var(--text-heading-24); line-height: var(--leading-heading-24); font-weight: 400; }
+@utility heading-24-medium { font-family: var(--font-heading); font-size: var(--text-heading-24); line-height: var(--leading-heading-24); font-weight: 500; }
+@utility heading-24-semibold { font-family: var(--font-heading); font-size: var(--text-heading-24); line-height: var(--leading-heading-24); font-weight: 600; }
+@utility heading-24-bold { font-family: var(--font-heading); font-size: var(--text-heading-24); line-height: var(--leading-heading-24); font-weight: 700; }
+@utility heading-20 { font-family: var(--font-heading); font-size: var(--text-heading-20); line-height: var(--leading-heading-20); font-weight: 400; }
+@utility heading-20-medium { font-family: var(--font-heading); font-size: var(--text-heading-20); line-height: var(--leading-heading-20); font-weight: 500; }
+@utility heading-20-semibold { font-family: var(--font-heading); font-size: var(--text-heading-20); line-height: var(--leading-heading-20); font-weight: 600; }
+@utility heading-20-bold { font-family: var(--font-heading); font-size: var(--text-heading-20); line-height: var(--leading-heading-20); font-weight: 700; }
+@utility heading-18 { font-family: var(--font-heading); font-size: var(--text-heading-18); line-height: var(--leading-heading-18); font-weight: 400; }
+@utility heading-18-medium { font-family: var(--font-heading); font-size: var(--text-heading-18); line-height: var(--leading-heading-18); font-weight: 500; }
+@utility heading-18-semibold { font-family: var(--font-heading); font-size: var(--text-heading-18); line-height: var(--leading-heading-18); font-weight: 600; }
+@utility heading-18-bold { font-family: var(--font-heading); font-size: var(--text-heading-18); line-height: var(--leading-heading-18); font-weight: 700; }
+@utility heading-16 { font-family: var(--font-heading); font-size: var(--text-heading-16); line-height: var(--leading-heading-16); font-weight: 400; }
+@utility heading-16-medium { font-family: var(--font-heading); font-size: var(--text-heading-16); line-height: var(--leading-heading-16); font-weight: 500; }
+@utility heading-16-semibold { font-family: var(--font-heading); font-size: var(--text-heading-16); line-height: var(--leading-heading-16); font-weight: 600; }
+@utility heading-16-bold { font-family: var(--font-heading); font-size: var(--text-heading-16); line-height: var(--leading-heading-16); font-weight: 700; }
+
+@utility paragraph-20 { font-family: var(--font-paragraph); font-size: var(--text-paragraph-20); line-height: var(--leading-paragraph-20); font-weight: 400; }
+@utility paragraph-20-medium { font-family: var(--font-paragraph); font-size: var(--text-paragraph-20); line-height: var(--leading-paragraph-20); font-weight: 500; }
+@utility paragraph-20-semibold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-20); line-height: var(--leading-paragraph-20); font-weight: 600; }
+@utility paragraph-20-bold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-20); line-height: var(--leading-paragraph-20); font-weight: 700; }
+@utility paragraph-18 { font-family: var(--font-paragraph); font-size: var(--text-paragraph-18); line-height: var(--leading-paragraph-18); font-weight: 400; }
+@utility paragraph-18-medium { font-family: var(--font-paragraph); font-size: var(--text-paragraph-18); line-height: var(--leading-paragraph-18); font-weight: 500; }
+@utility paragraph-18-semibold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-18); line-height: var(--leading-paragraph-18); font-weight: 600; }
+@utility paragraph-18-bold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-18); line-height: var(--leading-paragraph-18); font-weight: 700; }
+@utility paragraph-16 { font-family: var(--font-paragraph); font-size: var(--text-paragraph-16); line-height: var(--leading-paragraph-16); font-weight: 400; }
+@utility paragraph-16-medium { font-family: var(--font-paragraph); font-size: var(--text-paragraph-16); line-height: var(--leading-paragraph-16); font-weight: 500; }
+@utility paragraph-16-semibold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-16); line-height: var(--leading-paragraph-16); font-weight: 600; }
+@utility paragraph-16-bold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-16); line-height: var(--leading-paragraph-16); font-weight: 700; }
+@utility paragraph-15 { font-family: var(--font-paragraph); font-size: var(--text-paragraph-15); line-height: var(--leading-paragraph-15); font-weight: 400; }
+@utility paragraph-15-medium { font-family: var(--font-paragraph); font-size: var(--text-paragraph-15); line-height: var(--leading-paragraph-15); font-weight: 500; }
+@utility paragraph-15-semibold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-15); line-height: var(--leading-paragraph-15); font-weight: 600; }
+@utility paragraph-15-bold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-15); line-height: var(--leading-paragraph-15); font-weight: 700; }
+@utility paragraph-14 { font-family: var(--font-paragraph); font-size: var(--text-paragraph-14); line-height: var(--leading-paragraph-14); font-weight: 400; }
+@utility paragraph-14-medium { font-family: var(--font-paragraph); font-size: var(--text-paragraph-14); line-height: var(--leading-paragraph-14); font-weight: 500; }
+@utility paragraph-14-semibold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-14); line-height: var(--leading-paragraph-14); font-weight: 600; }
+@utility paragraph-14-bold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-14); line-height: var(--leading-paragraph-14); font-weight: 700; }
+@utility paragraph-12 { font-family: var(--font-paragraph); font-size: var(--text-paragraph-12); line-height: var(--leading-paragraph-12); font-weight: 400; }
+@utility paragraph-12-medium { font-family: var(--font-paragraph); font-size: var(--text-paragraph-12); line-height: var(--leading-paragraph-12); font-weight: 500; }
+@utility paragraph-12-semibold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-12); line-height: var(--leading-paragraph-12); font-weight: 600; }
+@utility paragraph-12-bold { font-family: var(--font-paragraph); font-size: var(--text-paragraph-12); line-height: var(--leading-paragraph-12); font-weight: 700; }

@@ -1,11 +1,132 @@
 ---
-// Menu dari blueprint navigations.header: field replicator menu_loop (menu_label, menu_url).
-const items: any[] = (navigation.header?.menu_loop ?? []);
+import { translations } from '../cms';
+const versions = entry?.id ? await translations(entry) : null;
+const targets = sites.filter((s: any) => s.handle !== site?.handle).map((s: any) => ({ name: s.name, href: versions ? versions.find((v) => v.site === s.handle)?.path : new URL(s.url || '/', 'http://x').pathname })).filter((t: any) => t.href !== undefined);
 ---
 
-<header class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-   <a href="/" class="font-bold">{global.site_settings?.site_name ?? site?.name}</a>
-   <nav class="flex gap-4">
-      {items.map((i) => <a href={i.menu_url || '#'}>{i.menu_label}</a>)}
-   </nav>
+
+<header class="border-b border-gray-200">
+   <div class="relative mx-auto grid max-w-7xl grid-cols-[1fr_auto] items-center px-6 py-4 lg:grid-cols-[1fr_auto_1fr]">
+
+      <div class="flex justify-start">
+         <img class="max-w-[100px]" src={navigation.header?.image.url} alt="">
+      </div>
+
+      <nav
+         id="main-menu"
+         class="absolute left-0 right-0 top-full z-50 hidden flex-col gap-4 border-b border-gray-200 bg-white px-6 py-5 lg:static lg:flex lg:flex-row lg:justify-center lg:border-0 lg:bg-transparent lg:p-0"
+      >
+         {navigation.header?.menu_loop?.map((item) => (
+            <a href={item.menu_url}>{item.menu_label}</a>
+         ))}
+      </nav>
+
+      <div class="flex items-center justify-end gap-4">
+
+         {sites.length > 1 && (
+            <div class="relative" id="language-switcher">
+               <button
+                  type="button"
+                  id="language-toggle"
+                  class="flex items-center gap-2"
+                  aria-expanded="false"
+               >
+                  {site?.name}
+
+                  {targets.length > 0 && (
+                     <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="m5 7.5 5 5 5-5" />
+                     </svg>
+                  )}
+               </button>
+
+               {targets.length > 0 && (
+                  <div
+                     id="language-dropdown"
+                     class="absolute right-0 top-full z-50 mt-3 hidden min-w-36 border border-gray-200 bg-white py-2"
+                  >
+                     {targets.map((t: any) => (
+                        <a
+                           href={t.href}
+                           class="block px-4 py-2 hover:bg-gray-100"
+                        >
+                           {t.name}
+                        </a>
+                     ))}
+                  </div>
+               )}
+            </div>
+         )}
+
+         <button
+            type="button"
+            id="menu-toggle"
+            aria-label="Toggle navigation"
+            aria-expanded="false"
+            class="flex items-center justify-center lg:hidden"
+         >
+            <svg id="menu-open-icon" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+               <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+
+            <svg id="menu-close-icon" class="hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+               <path d="m18 6-12 12M6 6l12 12" />
+            </svg>
+         </button>
+
+      </div>
+   </div>
 </header>
+
+<script>
+   const menuToggle = document.getElementById('menu-toggle')
+   const mainMenu = document.getElementById('main-menu')
+   const menuOpenIcon = document.getElementById('menu-open-icon')
+   const menuCloseIcon = document.getElementById('menu-close-icon')
+
+   menuToggle?.addEventListener('click', () => {
+      const isOpen = menuToggle.getAttribute('aria-expanded') === 'true'
+
+      menuToggle.setAttribute('aria-expanded', String(!isOpen))
+      mainMenu?.classList.toggle('hidden', isOpen)
+      menuOpenIcon?.classList.toggle('hidden', !isOpen)
+      menuCloseIcon?.classList.toggle('hidden', isOpen)
+   })
+
+   mainMenu?.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => {
+         mainMenu.classList.add('hidden')
+         menuToggle?.setAttribute('aria-expanded', 'false')
+         menuOpenIcon?.classList.remove('hidden')
+         menuCloseIcon?.classList.add('hidden')
+      })
+   })
+
+   const languageToggle = document.getElementById('language-toggle')
+   const languageDropdown = document.getElementById('language-dropdown')
+
+   languageToggle?.addEventListener('click', () => {
+      const isOpen = languageToggle.getAttribute('aria-expanded') === 'true'
+
+      languageToggle.setAttribute('aria-expanded', String(!isOpen))
+      languageDropdown?.classList.toggle('hidden', isOpen)
+   })
+
+   document.addEventListener('click', (event) => {
+      if (!event.target.closest('#language-switcher')) {
+         languageDropdown?.classList.add('hidden')
+         languageToggle?.setAttribute('aria-expanded', 'false')
+      }
+   })
+
+   window.addEventListener('resize', () => {
+      if (window.innerWidth >= 1024) {
+         mainMenu?.classList.remove('hidden')
+         menuToggle?.setAttribute('aria-expanded', 'false')
+         menuOpenIcon?.classList.remove('hidden')
+         menuCloseIcon?.classList.add('hidden')
+      } else {
+         mainMenu?.classList.add('hidden')
+      }
+   })
+</script>
