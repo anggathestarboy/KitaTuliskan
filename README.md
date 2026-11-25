@@ -5,6 +5,7 @@
 ## Preview
 
 ![Kita Tuliskan](docs/image.png)
+![Kita Tuliskan](docs/image2.png)
 
 ## Tech Stack
 
