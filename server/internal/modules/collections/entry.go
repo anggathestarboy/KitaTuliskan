@@ -314,6 +314,14 @@ func (m *mod) setURI(c *col, e *entry) {
 	m.a.DB.Exec(`UPDATE entries SET uri=? WHERE id=?`, v, e.ID)
 }
 
+// resyncURIs menghitung ulang uri semua entry collection. Pengganti fallback findEntry di source: Astro hanya mencocokkan kolom uri.
+// shortcut: O(n) query per simpan, ubah ke turunan entry yang berubah saja bila entry sudah ribuan.
+func (m *mod) resyncURIs(c *col) {
+	for _, e := range m.entryList("WHERE collection=?", c.Handle) {
+		m.setURI(c, e)
+	}
+}
+
 /* ---------- SitemapSyncer ---------- */
 
 func (m *mod) syncSitemap(e *entry) {

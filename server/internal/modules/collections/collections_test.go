@@ -53,8 +53,6 @@ func TestCollectionsLifecycle(t *testing.T) {
 		json.Unmarshal(w.Body.Bytes(), &out)
 		return w.Code, out
 	}
-	d.Exec(`DELETE FROM collections WHERE id=900`)
-	d.Exec(`ALTER TABLE collections AUTO_INCREMENT=1`) // id test lain mengandalkan urutan mulai dari 1
 	type J = map[string]any
 	// Halaman HTML (template valid + custom element terpasang) untuk keempat route.
 	d.Exec(`INSERT INTO collections(id,handle,title,settings,created_at,updated_at) VALUES(900,'pg','Pg','{}',NOW(),NOW())`)
@@ -67,6 +65,8 @@ func TestCollectionsLifecycle(t *testing.T) {
 			t.Fatalf("%s: %d tanpa %s", path, w.Code, tag)
 		}
 	}
+	d.Exec(`DELETE FROM collections WHERE id=900`)
+	d.Exec(`ALTER TABLE collections AUTO_INCREMENT=1`) // id test lain mengandalkan urutan mulai dari 1
 	seo := J{"meta_title": "T", "meta_description": "D", "meta_canonical": "", "robots": []string{"index", "follow"}, "meta_featured_image": []int{1}, "meta_author": "u1", "sitemap_priority": "0.8", "sitemap_changefreq": "weekly"}
 	save := func(h string, body J) (int, J) { return call("POST", "/collections/api/entry/"+h, body) }
 	str := func(q string, args ...any) (s string) { d.QueryRow(q, args...).Scan(&s); return }
@@ -141,6 +141,15 @@ func TestCollectionsLifecycle(t *testing.T) {
 	}
 	if c, o := save("pages", with(J{"title": "Deep", "slug": "deep", "parentId": about})); c != 422 || o["errors"].(J)["parentId"] == nil || num("SELECT COUNT(*) FROM entries WHERE slug='deep'") != 0 {
 		t.Fatalf("max depth harus ditolak dan entry baru dibatalkan: %d %v", c, o)
+	}
+
+	// ---- slug induk berubah → uri anak ikut (homepage selalu "", jadi dites lewat anak biasa) ----
+	d.Exec("UPDATE entries SET `order`=3 WHERE id=?", home)
+	if c, o := save("pages", with(J{"id": home, "slug": "start", "order": 3})); c != 200 || str("SELECT uri FROM entries WHERE id=?", about) != "start/about" {
+		t.Fatalf("uri anak harus ikut slug induk: %d %v", c, o)
+	}
+	if c, o := save("pages", with(J{"id": home, "order": 1})); c != 200 || str("SELECT uri FROM entries WHERE id=?", about) != "about" {
+		t.Fatalf("kembali jadi homepage: %d %v", c, o)
 	}
 
 	// ---- terjemahan: field non-localizable mengikuti origin, localizable boleh beda ----
@@ -233,6 +242,15 @@ func TestCollectionsLifecycle(t *testing.T) {
 	_, o = call("GET", "/collections/api/entry-list/posts", "")
 	if o["bulkAvailable"] != true || len(o["entries"].([]any)) != 2 {
 		t.Fatalf("daftar flat: %v", o)
+	}
+	// route diubah / dikosongkan setelah entry ada → uri ikut
+	flat := J{"id": 2, "title": "Posts", "handle": "posts", "routeMode": "single", "route": "news/{slug}", "sites": []string{"en", "id"}, "visibleOrder": true, "saveAction": "listing"}
+	if c, o := call("POST", "/collections/api/save", flat); c != 200 || str("SELECT uri FROM entries WHERE id=?", ids[0]) != "news/a" {
+		t.Fatalf("ganti route harus menghitung ulang uri: %d %v", c, o)
+	}
+	flat["route"] = ""
+	if c, _ := call("POST", "/collections/api/save", flat); c != 200 || num("SELECT COUNT(*) FROM entries WHERE collection='posts' AND uri IS NULL") != 2 {
+		t.Fatal("tanpa route uri harus NULL")
 	}
 	d.Exec(`UPDATE entries SET status='scheduled',published=0,`+"`date`"+`='2000-01-01 00:00' WHERE id=?`, ids[0])
 	if n := PublishScheduled(a); n != 1 || str("SELECT status FROM entries WHERE id=?", ids[0]) != "published" {
