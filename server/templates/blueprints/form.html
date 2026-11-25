@@ -5,6 +5,7 @@
 <section class="w-full max-w-7xl space-y-6" x-data="fieldBuilder({{json .State}}, {{json .Lookups}}, {{json .Editor}}, {flags: {{json .CollectionFlags}}})"
   @keydown.window.ctrl.s.prevent="$refs.form.requestSubmit()" @keydown.window.meta.s.prevent="$refs.form.requestSubmit()">
   {{template "page-header" (dict "Title" (cond .State.ID "Edit blueprint" "New blueprint"))}}
+  {{template "fe-summary"}}
 
   <form x-ref="form" method="post" action="{{.CP}}/blueprints/save" class="space-y-6">
     <input type="hidden" name="state" :value="payload()">

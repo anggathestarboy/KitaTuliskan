@@ -30,6 +30,9 @@ func TestTemplatesRender(t *testing.T) {
 		if strings.HasSuffix(name, "form.html") && !strings.Contains(out, "replicator_fields.indexOf(f5)") {
 			t.Fatalf("%s: field-editor recursion missing", name)
 		}
+		if strings.HasSuffix(name, "form.html") && !strings.Contains(out, "Please fix the following before saving:") {
+			t.Fatalf("%s: ringkasan error simpan hilang", name)
+		}
 		// state JSON di x-data harus di-escape tepat sekali (&#34;), bukan &amp;#34; — kalau dobel, Alpine gagal init dan semua method "is not defined".
 		if strings.HasSuffix(name, "form.html") && (!strings.Contains(out, `x-data="fieldBuilder({&#34;id&#34;`) || strings.Contains(out, "&amp;#34;")) {
 			t.Fatalf("%s: x-data JSON escaped wrong", name)
