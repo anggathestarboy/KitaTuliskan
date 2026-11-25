@@ -221,46 +221,24 @@
     </article>
     <!-- List teks -->
     <div class="flex flex-col">
-      <article class="group border-t border-neutral-200 py-6 first:pt-6 lg:pt-9">
+      {data?.profile_experience_loop?.map((item) => (
+          <article class="group border-t border-neutral-200 py-6 first:pt-6 lg:pt-9">
         <a
-          href="#"
           class="block focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900"
         >
           <div class="flex items-baseline justify-between gap-4">
-            <p class="paragraph-12-medium uppercase tracking-[0.08em] text-neutral-600">
-              Typography
-            </p>
             <p class="paragraph-12-medium shrink-0 text-neutral-600"></p>
           </div>
-          <h3 class="heading-40 mt-3 max-w-[22ch] text-neutral-950 decoration-1 underline-offset-4 group-hover:underline">
-            Proportion Before Ornament: Lessons from Swiss Bookmaking
+          <h3 class="heading-40 mt-3 text-neutral-950 decoration-1 underline-offset-4 ">
+            {item.experience_title}
           </h3>
-          <p class="paragraph-16 mt-3 max-w-[60ch] text-neutral-600">
-            When a page relies solely on paper, ink, and measure, every
-            typographic decision becomes structural rather than cosmetic.
+          <p class="paragraph-16 mt-3 text-neutral-600">
+            {item.experience_desc}
           </p>
         </a>
       </article>
-      <article class="group border-t border-b border-neutral-200 py-6 lg:pt-9">
-        <a
-          href="#"
-          class="block focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900"
-        >
-          <div class="flex items-baseline justify-between gap-4">
-            <p class="paragraph-12-medium uppercase tracking-[0.08em] text-neutral-600">
-              Digital Culture
-            </p>
-            <p class="paragraph-12-medium shrink-0 text-neutral-600"></p>
-          </div>
-          <h3 class="heading-40 mt-3 text-neutral-950 decoration-1 underline-offset-4 group-hover:underline">
-            Designing Interfaces That Know When to Step Back
-          </h3>
-          <p class="paragraph-16 mt-3 max-w-[60ch] text-neutral-600">
-            Why the most respectful software feels closer to a well-bound
-            reference volume than an entertainment feed.
-          </p>
-        </a>
-      </article>
+      ))}
+    
     </div>
   </div>
 </section>
