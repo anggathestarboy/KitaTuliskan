@@ -1,3 +1,189 @@
-<section class="container">
-   
+<!-- Section: Article header (HTML statis, Tailwind v4 + utility dari CSS kamu) -->
+<section aria-labelledby="article-title" class="container py-8 md:py-12">
+  <header class="mx-auto max-w-[920px]">
+    <!-- Category -->
+    <p class="paragraph-12-medium uppercase tracking-[0.08em] text-neutral-600">
+        {data.selected_news_taxonomy.title}
+    </p>
+
+    <!-- Title -->
+    <h1
+      id="article-title"
+      class="heading-56 md:heading-64 mt-4  text-neutral-950"
+    >
+      {data.title}
+    </h1>
+
+    <!-- Author row -->
+    <div class="mt-8 flex items-center justify-between gap-4 border-t border-neutral-200 pt-5">
+      <div class="flex items-center gap-3">
+        <img
+          src="https://placehold.co/80x80/e5e5e5/525252?text=AL"
+          alt="Anggara Lionheart"
+          width="40"
+          height="40"
+          class="h-10 w-10 shrink-0 bg-neutral-200 object-cover grayscale"
+        />
+        <div>
+          <p class="paragraph-14-semibold text-neutral-950">{entry.seo.meta_author}</p>
+          <p class="paragraph-12 text-neutral-600">
+            <time datetime="2026-11-18">{new Date(entry.date).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}</time>
+          
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="paragraph-12-medium inline-flex items-center gap-2 border border-neutral-300 px-3.5 py-2 text-neutral-900 transition-colors hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900"
+      >
+        <svg
+          aria-hidden="true"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+          <path d="M16 6l-4-4-4 4" />
+          <path d="M12 2v14" />
+        </svg>
+        Share essay
+      </button>
+    </div>
+  </header>
+
+  <!-- Featured image -->
+  <figure class="mt-8 md:mt-10">
+    <div class="aspect-[16/10] overflow-hidden bg-neutral-200">
+      <img
+        src={entry.seo.meta_featured_image.url}
+        alt="Brutalist civic library with unfinished concrete facade"
+        width="1600"
+        height="1000"
+        class="h-full w-full object-cover grayscale"
+      />
+    </div>
+    <figcaption class="paragraph-12 mt-3 text-neutral-600">
+      {entry.seo.meta_featured_image.title}
+    </figcaption>
+  </figure>
 </section>
+
+
+<!-- Section: Article body (rich text + TOC otomatis dari h2) -->
+<section class="container pb-12 md:pb-20">
+  <div class="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-x-16 lg:items-stretch">
+    <!-- TOC: diisi otomatis dari semua <h2> di #article-content -->
+    <aside class="hidden lg:block lg:h-full">
+      <nav
+        id="toc"
+        aria-label="Contents"
+        class="sticky top-6 border-t border-neutral-200 pt-4"
+        hidden
+      >
+        <p class="paragraph-12-medium uppercase tracking-[0.08em] text-neutral-900">
+          Contents
+        </p>
+        <ul id="toc-list" class="mt-5 flex flex-col gap-3"></ul>
+      </nav>
+    </aside>
+
+    <!-- Rich text -->
+    <!-- Di Astro: <div id="article-content" class="..." set:html={item.news_content} /> -->
+    <div
+  id="article-content"
+  class="min-w-0 max-w-[860px] text-neutral-700
+    [&_p]:paragraph-16 md:[&_p]:paragraph-18 [&_p]:mt-6 [&_p:first-child]:mt-0
+    [&_h2]:heading-32 [&_h2]:mt-12 [&_h2]:scroll-mt-24 [&_h2]:text-neutral-950
+    [&_h3]:heading-24 [&_h3]:mt-8 [&_h3]:scroll-mt-24 [&_h3]:text-neutral-950
+    [&_a]:text-neutral-950 [&_a]:underline [&_a]:underline-offset-4
+    [&_ul]:mt-6 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mt-6 [&_ol]:list-decimal [&_ol]:pl-6
+    [&_li]:paragraph-16 md:[&_li]:paragraph-18 [&_li]:mt-2
+    [&_blockquote]:my-10 [&_blockquote]:border-l-2 [&_blockquote]:border-neutral-900 [&_blockquote]:pl-5
+    [&_blockquote_p]:heading-24 [&_blockquote_p]:italic [&_blockquote_p]:text-neutral-800
+    [&_cite]:paragraph-12 [&_cite]:mt-3 [&_cite]:block [&_cite]:not-italic [&_cite]:text-neutral-600
+    [&_img]:mt-8 [&_img]:h-auto [&_img]:w-full"
+  set:html={data.news_content ?? ""}
+></div>
+
+  </div>
+</section>
+
+<script>
+  (function () {
+    const content = document.getElementById("article-content");
+    const nav = document.getElementById("toc");
+    const list = document.getElementById("toc-list");
+    if (!content || !nav || !list) return;
+
+    const headings = Array.from(content.querySelectorAll("h2"));
+    if (!headings.length) return;
+
+    const slugify = (text) =>
+      text
+        .toLowerCase()
+        .replace(/&/g, "and")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+
+    const used = new Set();
+    const links = headings.map((h, i) => {
+      let id = h.id || slugify(h.textContent || "") || "section-" + (i + 1);
+      while (used.has(id)) id += "-" + (i + 1);
+      used.add(id);
+      h.id = id;
+
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "#" + id;
+      a.textContent = h.textContent.trim();
+      a.className =
+        "paragraph-12-medium block text-neutral-500 transition-colors hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900";
+      li.appendChild(a);
+      list.appendChild(li);
+      return a;
+    });
+
+    nav.hidden = false;
+
+    // Fix sticky: elemen induk dengan overflow:hidden mematikan position:sticky.
+    // "clip" tampil sama, tapi tidak membuat scroll container.
+    for (let el = nav.parentElement; el && el !== document.documentElement; el = el.parentElement) {
+      const cs = getComputedStyle(el);
+      if (cs.overflowX === "hidden") el.style.overflowX = "clip";
+      if (cs.overflowY === "hidden") el.style.overflowY = "clip";
+    }
+
+    const setActive = (id) => {
+      links.forEach((a) => {
+        const on = a.getAttribute("href") === "#" + id;
+        a.classList.toggle("text-neutral-950", on);
+        a.classList.toggle("text-neutral-500", !on);
+        if (on) a.setAttribute("aria-current", "true");
+        else a.removeAttribute("aria-current");
+      });
+    };
+
+    setActive(headings[0].id);
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length) setActive(visible[0].target.id);
+      },
+      { rootMargin: "-96px 0px -65% 0px", threshold: 0 }
+    );
+    headings.forEach((h) => observer.observe(h));
+  })();
+</script>
