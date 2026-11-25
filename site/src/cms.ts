@@ -8,7 +8,7 @@
 // shortcut: filter di memori dari /api/{table} (cukup untuk build statis skala kecil), pindah ke query SQL bila data besar.
 // Field "assets" di-resolve jadi objek (= AssetMeta): data.image.url / .alt / .width / .height / .loading / .title / .mime_type ...
 // max_items 1 → satu objek (data.image.url), selain itu array (data.gallery.map(i => i.url)). Hanya container disk public.
-// shortcut: link "entry::{id}" di data belum di-resolve (source: resolveLinkFields).
+// Field "link" bernilai "entry::{id}" di-resolve jadi path entry versi site yang dirender; tidak ada / belum published → "#".
 const base = import.meta.env.CMS_URL ?? 'http://localhost:8000';
 type Row = Record<string, any>;
 // SSR: data harus live. Cache hanya 2 detik supaya beberapa pemanggilan dalam satu render tidak mengulang fetch.
@@ -52,9 +52,14 @@ const fieldsOf = async (ns: string) => json((await api('blueprints')).find((b) =
 // term taxonomy siap pakai: field data diratakan (t.title), t.data tetap ada.
 const term = (t: Row): Row => { const data = live(json(t.data)); return { ...data, ...t, data }; };
 
-// = resolveAssetFields: id asset / term taxonomy → objek, rekursif ke dalam replicator (max_items 1 → satu objek, selain itu array).
-async function resolveAssets(data: Row, fields: Row[]): Promise<Row> {
-  const assets = (await api('assets')) as Row[], terms = (await api('taxonomy_terms')) as Row[];
+// = resolveAssetFields + resolveLinkFields: id asset / term taxonomy → objek, link entry → path, rekursif ke dalam replicator (max_items 1 → satu objek, selain itu array).
+async function resolveAssets(data: Row, fields: Row[], site?: string): Promise<Row> {
+  const assets = (await api('assets')) as Row[], terms = (await api('taxonomy_terms')) as Row[], entries = (await api('entries')) as Entry[], allSites = await sites();
+  const link = (id: string) => {
+    const target = entries.find((e) => e.id === id), key = target?.origin_id ?? id;
+    const own = site ? entries.find((e) => e.site === site && (e.origin_id ?? e.id) === key) : target; // /api/entries hanya berisi yang published
+    return own ? '/' + pathOf(own, allSites) : '#';
+  };
   const walk = (d: Row, fs: Row[]): Row => {
     d = { ...d };
     for (const f of fs) {
@@ -66,7 +71,7 @@ async function resolveAssets(data: Row, fields: Row[]): Promise<Row> {
         const ids = (Array.isArray(d[f.handle]) ? d[f.handle] : []).map(Number);
         const found = ids.map((id: number) => assets.find((a) => a.id === id)).filter(Boolean);
         d[f.handle] = f.max_items == null || f.max_items > 1 ? found : found[0] ?? null;
-      }
+      } else if (f.type === 'link' && String(d[f.handle] ?? '').startsWith('entry::')) d[f.handle] = link(d[f.handle].slice(7));
     }
     return d;
   };
@@ -74,7 +79,7 @@ async function resolveAssets(data: Row, fields: Row[]): Promise<Row> {
 }
 
 // data entry siap pakai di template: JSON ter-parse + field assets ter-resolve.
-export const entryData = async (e: Row): Promise<Row> => resolveAssets(json(e.data), json((await blueprint(e.blueprint))?.data).fields ?? []);
+export const entryData = async (e: Row): Promise<Row> => resolveAssets(json(e.data), json((await blueprint(e.blueprint))?.data).fields ?? [], e.site);
 
 // SEO tools entry (kolom seo): objek siap pakai, meta_featured_image di-resolve jadi satu objek asset (atau null). Juga diratakan ke item collection: item.meta_title.
 // meta_author (id user) diganti nama dari /api/authors; id aslinya di meta_author_id.
@@ -110,7 +115,7 @@ export async function globalSet(handle: string, o: { site?: string } = {}): Prom
   if (!first) return null;
   const data = json(first.data), own = site !== origin ? pick(site) : undefined, fields = await fieldsOf(`globals.${handle}`);
   if (own) for (const f of fields) if ((f.type === 'replicator' || f.localizable) && json(own.data)[f.handle]) data[f.handle] = json(own.data)[f.handle];
-  return resolveAssets(data, fields);
+  return resolveAssets(data, fields, site);
 }
 
 // @navigation: mode blueprint → objek nilai field; mode lama → daftar item. locale NULL bila hanya satu site.
@@ -123,7 +128,7 @@ export async function navigation(handle: string, o: { site?: string } = {}): Pro
   if (Array.isArray(data)) return data;
   const fields = await fieldsOf(`navigations.${handle}`);
   if (own) for (const f of fields) if (f.localizable && json(own.tree)[f.handle] !== undefined) data[f.handle] = json(own.tree)[f.handle];
-  return resolveAssets(data, fields);
+  return resolveAssets(data, fields, site);
 }
 
 // Semua yang dibutuhkan template, format fitur.handle.field: global.global_sidebar.site_image.url, navigation.header.menu_loop,
@@ -151,12 +156,13 @@ export async function context(siteHandle?: string) {
 export const formAction = (handle: string) => `${base}/!/forms/${handle}`;
 
 // Path publik entry = prefix path URL site + entry.uri (uri homepage "" atau "/").
-export const entryPath = async (e: Entry) => {
-  const site = (await sites()).find((s) => s.handle === e.site);
+export const entryPath = async (e: Entry) => pathOf(e, await sites());
+function pathOf(e: Entry, all: Row[]) {
+  const site = all.find((s) => s.handle === e.site);
   // order 1 = homepage (uri ""), apa pun isi kolom uri yang bisa basi; selain itu uri kosong yang basi (bekas homepage) jatuh ke slug.
   const uri = Number(e.order) === 1 ? '' : (e.uri ?? '').replace(/^\/+$/, '') || e.slug;
   return [new URL(site?.url || '/', 'http://x').pathname, uri].join('/').split('/').filter(Boolean).join('/');
-};
+}
 
 // Versi bahasa entry yang sudah published (satu origin-family: origin_id ?? id), termasuk entry itu sendiri → [{ site, path }].
 export const translations = async (e: Row) => {
