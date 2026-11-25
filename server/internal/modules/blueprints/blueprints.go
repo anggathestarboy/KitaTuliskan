@@ -75,8 +75,17 @@ func Register(mux *http.ServeMux, a *web.App) {
 		http.Redirect(w, r, a.CP("/blueprints"), http.StatusFound)
 	})
 
+	// Turbo membuang respons form berstatus 200; POST yang merender ulang form (= simpan gagal) wajib 422 supaya error tampil.
+	rejected := func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusUnprocessableEntity)
+		}
+	}
+
 	// ---- BlueprintForm ----
 	renderBlueprint := func(w http.ResponseWriter, r *http.Request, st State) {
+		rejected(w, r)
 		a.Render(w, r, "blueprints/form.html", map[string]any{"State": st, "Namespaces": namespaces(a), "Templates": templates(), "Lookups": lookups(a), "CollectionFlags": collectionFlags(a), "Editor": editorData()})
 	}
 	a.Admin(mux, "GET /blueprints/create", func(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +159,7 @@ func Register(mux *http.ServeMux, a *web.App) {
 		data, _ := json.Marshal(map[string]any{"template": nullable(st.Template), "fields_collapsed_by_default": st.FieldsCollapsedByDefault, "tabs": tabs, "fields": fields})
 		id, err := upsert(a, "blueprints", st.ID, []string{"namespace", "handle", "data"}, nullable(st.Namespace), st.Handle, string(data))
 		if err != nil {
-			web.Flash(w, err.Error())
+			st.Errors["save"] = "Could not save: " + err.Error() // flash baru terbaca di request berikutnya, jadi tampilkan di form ini
 			renderBlueprint(w, r, st)
 			return
 		}
@@ -181,6 +190,7 @@ func Register(mux *http.ServeMux, a *web.App) {
 
 	// ---- FieldsetForm ----
 	renderFieldset := func(w http.ResponseWriter, r *http.Request, st State) {
+		rejected(w, r)
 		a.Render(w, r, "blueprints/fieldset-form.html", map[string]any{"State": st, "Lookups": lookups(a), "Editor": editorData()})
 	}
 	a.Admin(mux, "GET /fieldsets/create", func(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +242,7 @@ func Register(mux *http.ServeMux, a *web.App) {
 		data, _ := json.Marshal(map[string]any{"fields_collapsed_by_default": st.FieldsCollapsedByDefault, "fields": fields})
 		id, err := upsert(a, "fieldsets", st.ID, []string{"handle", "data"}, st.Handle, string(data))
 		if err != nil {
-			web.Flash(w, err.Error())
+			st.Errors["save"] = "Could not save: " + err.Error()
 			renderFieldset(w, r, st)
 			return
 		}
