@@ -1,0 +1,68 @@
+<!-- Section: daftar semua artikel blog, monokrom -->
+<section aria-labelledby="all-articles" class="container">
+  <header class="border-b border-neutral-900 py-8">
+    <h1 class="heading-48 md:heading-64 text-neutral-950">
+      {data.overview_title}
+    </h1>
+    <p >{data.overview_desc}</p>
+  </header>
+
+  {!collection.blog?.length && (
+    <p class="paragraph-16 py-10 text-neutral-600">No articles yet.</p>
+  )}
+
+  <ul class="divide-y divide-neutral-200">
+    {collection.blog?.map((item) => (
+      <li>
+        <article class="group py-6 md:py-8">
+          <a
+            href={item.url}
+            class="grid grid-cols-[112px_minmax(0,1fr)] items-start gap-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-900 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-10"
+          >
+            <div class="aspect-[4/3] overflow-hidden bg-neutral-200">
+              {item.meta_featured_image && (
+                <img
+                  src={item.meta_featured_image.url}
+                  alt=""
+                  width={item.meta_featured_image.width}
+                  height={item.meta_featured_image.height}
+                  loading="lazy"
+                  class="h-full w-full object-cover grayscale"
+                />
+              )}
+            </div>
+            <div class="min-w-0">
+              <p class="paragraph-12-medium uppercase tracking-[0.08em] text-neutral-600">
+                {item.selected_news_taxonomy?.title}
+              </p>
+              <h2 class="heading-24-semibold mt-2 text-neutral-950 decoration-1 underline-offset-4 group-hover:underline">
+                {item.title}
+              </h2>
+              <p
+                class="paragraph-16 mt-3 hidden max-w-[65ch] text-neutral-600 sm:line-clamp-2"
+                set:html={item.news_content?.replace(/<[^>]*>/g, " ")}
+              />
+              <p class="paragraph-12-medium mt-3 text-neutral-600 sm:mt-4">
+                {item.date && (
+                  <time datetime={item.date}>
+                    {new Date(item.date).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </time>
+                )}
+                {item.meta_author && (
+                  <>
+                    <span aria-hidden="true" class="mx-2">&middot;</span>
+                    <span>{item.meta_author}</span>
+                  </>
+                )}
+              </p>
+            </div>
+          </a>
+        </article>
+      </li>
+    ))}
+  </ul>
+</section>

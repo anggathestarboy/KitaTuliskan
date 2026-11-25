@@ -1,4 +1,51 @@
-<section class="mx-auto my-16 max-w-2xl px-4">
-   <h1 class="text-3xl font-bold">{data.title}</h1>
-   <div set:html={data.content} />
-</section>
+<main class="flex-1">
+  <!-- Section: Author profile (HTML statis, Tailwind v4 + utility dari CSS kamu) -->
+  <section aria-labelledby="author-name" class="container py-8 md:py-12">
+    <div class="grid gap-8 md:grid-cols-[minmax(0,0.42fr)_minmax(0,1fr)] md:gap-10 lg:grid-cols-[minmax(0,0.38fr)_minmax(0,1fr)] lg:gap-12">
+      <!-- Foto -->
+      <div class="aspect-[4/5] overflow-hidden bg-neutral-200">
+        <img
+          src={data.picture.url}
+          alt="Portrait of Julian Vance seated by a window"
+          width="800"
+          height="1000"
+          loading="lazy"
+          class="h-full w-full object-cover grayscale"
+        />
+      </div>
+      <!-- Konten -->
+      <div class="flex min-w-0 flex-col">
+        <!-- Identitas -->
+        <div>
+          <h2
+            id="author-name"
+            class="heading-48 md:heading-56 mt-3 text-neutral-950"
+          >
+            {data.name}
+          </h2>
+          <p class="paragraph-14 mt-2 text-neutral-600">
+            {data.role}
+          </p>
+          <p class="paragraph-16 md:paragraph-18 mt-6 max-w-[60ch] text-neutral-900">
+            {data.desc}
+          </p>
+        </div>
+        <!-- Interests & Expertise -->
+        <div class="mt-8 grid gap-6 border-t border-neutral-200 pt-6 sm:grid-cols-2 sm:gap-10">
+          <div>
+            <h3 class="font-paragraph paragraph-12-medium tracking-[0.08em] text-neutral-600">
+              {data.skill_label}
+            </h3>
+            <ul class="paragraph-14 mt-3 space-y-1.5 text-neutral-900">
+               {data?.skill_loop?.map((item, index) => (
+                  <li>{index + 1}. {item.skill_name}</li>
+               ))}
+              
+            </ul>
+          </div>
+        </div>
+        <!-- Links -->
+      </div>
+    </div>
+  </section>
+</main>
