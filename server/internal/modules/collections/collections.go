@@ -288,6 +288,12 @@ func (m *mod) registerManager(mux *http.ServeMux) {
 			} else {
 				_, err = a.DB.Exec(`UPDATE collections SET title=?, settings=?, updated_at=? WHERE id=?`, title, string(raw), web.Now(), in.ID)
 			}
+			if err == nil && old != nil { // route bisa berubah
+				var c *col
+				if c, err = m.col(handle); err == nil {
+					m.resyncURIs(c)
+				}
+			}
 			if err == nil {
 				m.log(r, action, "collection", "collection '"+title+"'")
 			}

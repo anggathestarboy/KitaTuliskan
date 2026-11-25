@@ -545,6 +545,9 @@ func (m *mod) save(w http.ResponseWriter, r *http.Request, ec *ectx, title, slug
 		}
 	}
 	m.syncSitemap(e)
+	if c.Structured { // {parent_uri}: slug/induk berubah menggeser uri turunannya
+		m.resyncURIs(c)
+	}
 
 	action := "updated"
 	if created {
