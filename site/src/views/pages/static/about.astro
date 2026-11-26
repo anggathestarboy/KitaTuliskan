@@ -48,4 +48,54 @@
       </div>
     </div>
   </section>
+
+
+  <!-- Section: Author story (HTML statis, Tailwind v4 + utility dari CSS kamu) -->
+<section aria-labelledby="author-story" class="container py-8 md:py-12">
+  <div class="grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16">
+    <!-- Kiri: judul + foto + caption -->
+    <div class="min-w-0">
+      <h2
+        id="author-story"
+        class="heading-36 text-neutral-950"
+      >
+        {data.bio_header }
+      </h2>
+
+      <figure class="mt-4">
+        <div class="aspect-[4/3] overflow-hidden bg-neutral-200">
+          <img
+            src={data.bio_image.url}
+            alt="Wooden desk beside a large steel-framed window with an open notebook and a cup"
+            width="1200"
+            height="900"
+            loading="lazy"
+            class="h-full w-full object-cover grayscale"
+          />
+        </div>
+      </figure>
+    </div>
+
+    <!-- Kanan: teks -->
+    <div class="paragraph-16 md:paragraph-18 min-w-0 max-w-[62ch] space-y-6 text-neutral-900 md:space-y-7 lg:pt-2">
+      <p>
+        Julian Vance trained as an editorial typographer in Zurich, where he spent eight years
+        designing architectural monographs, museum catalogues, and small-run literary journals.
+        Working closely with bookbinders and offset printers taught him that restraint, proportion,
+        and paper grain carry as much meaning as the words set upon them.
+      </p>
+      <p>
+        In 2022 he stepped away from agency commissions to establish this independent publication.
+        His essays examine how civic spaces&mdash;municipal libraries, railway halls, and quiet
+        neighborhood streets&mdash;age alongside the communities that inhabit them, as well as how
+        digital reading environments can borrow the calm durability of print.
+      </p>
+      <p>
+        He currently divides his time between Zurich and Copenhagen, documenting buildings on
+        black-and-white medium-format film and maintaining a long-running plain-text archive of
+        field notes, reading lists, and architectural drawings.
+      </p>
+    </div>
+  </div>
+</section>
 </main>
