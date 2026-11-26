@@ -1,11 +1,13 @@
 // Padanan collections::partials.entry-field (cabang yang dipakai form Navigation) + EvaluatesFieldConditions.
-// Replicator tidak dirender di sini: di Navigation ia selalu daftar menu (lihat Content.tsx = menu-list/menu-item).
+import { arrayMove, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { type ReactNode, useEffect, useState } from 'react';
 import { type Asset } from '../media/api';
 import { Checkbox } from '../shared/flux';
 import { Button, Icon, Input, Select, cn } from '../shared/ui';
 import { type ContentData, type Field } from './api';
 import { Bard, PROSE } from './Bard';
+import { SortList } from './SortList';
 
 export type Path = (string | number)[];
 export type Bag = Record<string, unknown>;
@@ -154,7 +156,41 @@ export function FieldView({ f, path, value, env }: { f: Field; path: Path; value
   }
 }
 
-/* replicator: kartu baris (aktif/duplikat/hapus), tombol Add + batas max_items */
+/* replicator: kartu baris (drag urut/aktif/duplikat/hapus), tombol Add + batas max_items */
+
+const xs = 'h-6! w-6!';
+
+// Komponen level atas supaya isi baris (editor Bard, input) tidak di-mount ulang saat urutan berubah.
+function ReplicatorRow({ f, path, rows, i, shut, toggle, limit, env }: { f: Field; path: Path; rows: Bag[]; i: number; shut: boolean; toggle: () => void; limit: boolean; env: Env }) {
+  const row = rows[i];
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: String(row._uid) });
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn('relative rounded-xl border border-zinc-200 bg-gray-200 p-1 dark:border-zinc-700 dark:bg-zinc-900', row._enabled === false && 'opacity-60', isDragging && 'z-20 border-blue-400 shadow-xl ring-2 ring-blue-400/40 dark:border-blue-500')}>
+      <div className="flex items-center justify-between gap-4 px-3 py-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <span ref={setActivatorNodeRef} {...attributes} {...listeners} title="Drag to reorder" aria-label="Drag to reorder" className={cn('shrink-0 touch-none text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300', isDragging ? 'cursor-grabbing' : 'cursor-grab')}><Icon name="bars-3" className="size-4" /></span>
+          <button type="button" onClick={toggle} className="flex min-w-0 cursor-pointer items-center gap-1 text-sm font-medium text-zinc-600 hover:text-orange-700 dark:text-zinc-300">
+            <Icon name={shut ? 'chevron-right' : 'chevron-down'} className="size-4 shrink-0" />
+            <span className="truncate">{f.display} #{i + 1}</span>
+          </button>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Switch on={row._enabled !== false} title="Enabled" onChange={(v) => env.set([...path, i, '_enabled'], v)} />
+          <Button variant="ghost" icon="document-duplicate" title="Duplicate" aria-label="Duplicate" disabled={limit} className={xs}
+            onClick={() => env.set(path, [...rows.slice(0, i + 1), { ...structuredClone(row), _uid: uid() }, ...rows.slice(i + 1)])} />
+          <Button variant="ghost" icon="trash" title="Delete" aria-label="Delete" className={xs}
+            onClick={() => { if (confirm('Delete this item? This cannot be undone.')) env.set(path, rows.filter((_, x) => x !== i)); }} />
+        </div>
+      </div>
+      {!shut && (
+        <div className="mt-1 grid gap-3 rounded-xl bg-white px-2 py-3 dark:bg-zinc-800">
+          {(f.replicator_fields ?? []).filter((x) => visible(x, row)).map((x) => <div key={x.handle}><FieldView f={x} path={[...path, i, x.handle]} value={row[x.handle]} env={env} /></div>)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ReplicatorField({ f, path, rows, err, env }: { f: Field; path: Path; rows: Bag[]; err?: string; env: Env }) {
   const [shut, setShut] = useState<Record<string, boolean>>({});
@@ -162,7 +198,6 @@ function ReplicatorField({ f, path, rows, err, env }: { f: Field; path: Path; ro
   const limit = max !== null && rows.length >= max;
   const isShut = (r: Bag) => shut[String(r._uid)] ?? !!f.collapsed_by_default;
   const all = (v: boolean) => setShut(Object.fromEntries(rows.map((r) => [String(r._uid), v])));
-  const xs = 'h-6! w-6!';
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
@@ -179,31 +214,12 @@ function ReplicatorField({ f, path, rows, err, env }: { f: Field; path: Path; ro
       </div>
       <div className="mt-2 space-y-3">
         {rows.length === 0 && <p className="text-sm text-zinc-500 dark:text-white/70">No entries yet.</p>}
-        {rows.map((row, i) => {
-          const shutNow = isShut(row);
-          return (
-            <div key={String(row._uid)} className={cn('rounded-xl border border-zinc-200 bg-gray-200 p-1 dark:border-zinc-700 dark:bg-zinc-900', row._enabled === false && 'opacity-60')}>
-              <div className="flex items-center justify-between gap-4 px-3 py-1">
-                <button type="button" onClick={() => setShut({ ...shut, [String(row._uid)]: !shutNow })} className="flex min-w-0 cursor-pointer items-center gap-1 text-sm font-medium text-zinc-600 hover:text-orange-700 dark:text-zinc-300">
-                  <Icon name={shutNow ? 'chevron-right' : 'chevron-down'} className="size-4 shrink-0" />
-                  <span className="truncate">{f.display} #{i + 1}</span>
-                </button>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Switch on={row._enabled !== false} title="Enabled" onChange={(v) => env.set([...path, i, '_enabled'], v)} />
-                  <Button variant="ghost" icon="document-duplicate" title="Duplicate" aria-label="Duplicate" disabled={limit} className={xs}
-                    onClick={() => env.set(path, [...rows.slice(0, i + 1), { ...structuredClone(row), _uid: uid() }, ...rows.slice(i + 1)])} />
-                  <Button variant="ghost" icon="trash" title="Delete" aria-label="Delete" className={xs}
-                    onClick={() => { if (confirm('Delete this item? This cannot be undone.')) env.set(path, rows.filter((_, x) => x !== i)); }} />
-                </div>
-              </div>
-              {!shutNow && (
-                <div className="mt-1 grid gap-3 rounded-xl bg-white px-2 py-3 dark:bg-zinc-800">
-                  {(f.replicator_fields ?? []).filter((x) => visible(x, row)).map((x) => <div key={x.handle}><FieldView f={x} path={[...path, i, x.handle]} value={row[x.handle]} env={env} /></div>)}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        <SortList ids={rows.map((r) => String(r._uid))} onSort={(id, to) => env.set(path, arrayMove(rows, rows.findIndex((r) => String(r._uid) === id), to))}>
+          {rows.map((row, i) => {
+            const id = String(row._uid), shutNow = isShut(row);
+            return <ReplicatorRow key={id} f={f} path={path} rows={rows} i={i} shut={shutNow} toggle={() => setShut({ ...shut, [id]: !shutNow })} limit={limit} env={env} />;
+          })}
+        </SortList>
         <div className="flex items-center gap-2">
           <Button variant="filled" disabled={limit} onClick={() => env.set(path, [...rows, { _uid: uid(), _enabled: true, ...blank(f.replicator_fields ?? []) }])}>Add {f.display}</Button>
           {max !== null && <span className="text-xs text-zinc-500 dark:text-white/70">{rows.length} / {max}</span>}

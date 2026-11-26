@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Asset } from '../media/api';
 import { AssetPicker, type PickerState } from '../navigation/AssetPicker';
 import { ApiError, type ContentData, type Field, call, slug as slugify, visit } from '../navigation/api';
-import { assetIds, put, strip, withUids } from '../navigation/Content';
+import { assetIds, dropErrors, put, strip, withUids } from '../navigation/Content';
 import { type Bag, type Env, FieldView, Locked, visible } from '../navigation/Fields';
 import { Radio, useToasts } from '../shared/flux';
 import { Button, Icon, Input, Select, Text, Toasts, cn } from '../shared/ui';
@@ -111,7 +111,7 @@ export function EntryForm({ cp, handle, id, site }: { cp: string; handle: string
   const clear = (k: string) => setErrors((e) => { const { [k]: _, ...rest } = e; return rest; });
   const env: Env = {
     cd, errors, assets,
-    set: (path, v) => { setData((d) => put(d, path, v) as Bag); clear(path.join('.')); },
+    set: (path, v) => { setData((d) => put(d, path, v) as Bag); setErrors((e) => dropErrors(e, path)); },
     pickAssets: (f, path, ids) => setPicker({
       container: String(f.options ?? ''), max: f.max_items ?? null, validation: f.validation ?? '', selected: ids.map((x) => assets[x]).filter(Boolean),
       ok: (picked, got) => { setAssets((a) => ({ ...a, ...Object.fromEntries(got.map((x) => [x.id, x])) })); env.set(path, picked); },
