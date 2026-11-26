@@ -1,31 +1,15 @@
 // Padanan NavigationTreeEditor (mode legacy tree) + navigation-tree-editor.blade.php. Semua edit terjadi di memori;
 // hanya tombol Save (atau Ctrl+S) yang menyimpan, persis seperti di source.
-import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type Modifier } from '@dnd-kit/core';
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Checkbox, ContextMenu, type MenuAction, useToasts } from '../shared/flux';
 import { Button, Heading, Icon, Input, Modal, ModalActions, Select, Text, Toasts, cn } from '../shared/ui';
 import { type TreeData, client } from './api';
+import { SortList } from './SortList';
 import * as T from './tree';
 
 type Role = TreeData['roles'][number];
-
-// Drag & drop urut (wire:sort di source): item mengikuti kursor, item lain bergeser menyingkir dengan animasi.
-// Tiap list (root, tiap daftar anak) punya DndContext sendiri, jadi item tidak bisa dipindah antar-list (itu lewat "Move to...").
-const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
-
-function SortList({ ids, onSort, children }: { ids: string[]; onSort: (id: string, position: number) => void; children: ReactNode }) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-  return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[verticalOnly]} onDragEnd={({ active, over }) => {
-      if (!over || active.id === over.id) return;
-      onSort(String(active.id), arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id))).indexOf(String(active.id)));
-    }}>
-      <SortableContext items={ids} strategy={verticalListSortingStrategy}>{children}</SortableContext>
-    </DndContext>
-  );
-}
 
 interface Ctx {
   data: TreeData; expanded: string[]; sidebar: boolean; canEdit: boolean;

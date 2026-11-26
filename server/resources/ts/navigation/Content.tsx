@@ -17,6 +17,12 @@ export const put = (d: unknown, path: Path, v: unknown): unknown => {
   return copy;
 };
 
+// Buang error path ini beserta turunannya (kuncinya memuat indeks baris, yang bergeser saat diurutkan/dihapus).
+export const dropErrors = (e: Record<string, string>, path: Path) => {
+  const p = path.join('.');
+  return Object.fromEntries(Object.entries(e).filter(([k]) => k !== p && !k.startsWith(`${p}.`)));
+};
+
 // Setiap baris replicator butuh _uid (kunci React & editor Bard); dibuang lagi saat simpan, seperti stripRowUids.
 export function withUids(fields: Field[], data: Bag): Bag {
   const out = { ...data };
@@ -101,7 +107,7 @@ export function Content({ cp, handle, scope = 'navigations', noun = 'Navigation'
 
   const env: Env = {
     cd, errors, assets,
-    set: (path, v) => { setData((d) => put(d, path, v) as Bag); setErrors((e) => { const { [path.join('.')]: _, ...rest } = e; return rest; }); },
+    set: (path, v) => { setData((d) => put(d, path, v) as Bag); setErrors((e) => dropErrors(e, path)); },
     pickAssets: (f, path, ids) => setPicker({
       container: String(f.options ?? ''), max: f.max_items ?? null, validation: f.validation ?? '', selected: ids.map((id) => assets[id]).filter(Boolean),
       ok: (picked, got) => { setAssets((a) => ({ ...a, ...Object.fromEntries(got.map((x) => [x.id, x])) })); env.set(path, picked); },
